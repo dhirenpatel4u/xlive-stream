@@ -20,7 +20,6 @@ export default function App() {
 
   return (
     <Routes>
-
       <Route
         path="/login"
         element={
@@ -50,13 +49,19 @@ export default function App() {
         }
       />
 
-      <Route path="/live-watch" element={<LiveWatch />} />
+      <Route
+        path="/live-watch"
+        element={
+          <Protected loggedIn={loggedIn}>
+            <LiveWatch />
+          </Protected>
+        }
+      />
 
       <Route
         path="*"
         element={<Navigate to="/" replace />}
       />
-
     </Routes>
   )
 }
