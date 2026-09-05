@@ -1,3 +1,4 @@
+```jsx
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Hls from 'hls.js'
@@ -7,10 +8,10 @@ export default function LiveWatch() {
   const location = useLocation()
 
   const videoRef = useRef(null)
+  const hlsRef = useRef(null)
+
   const touchStartY = useRef(null)
   const touchStartX = useRef(null)
-  const hlsRef = useRef(null)
-  const changingStream = useRef(false)
 
   const state = location.state || {}
 
@@ -24,6 +25,8 @@ export default function LiveWatch() {
       : 0
 
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [isMuted, setIsMuted] = useState(false)
 
   const currentModel = models[currentIndex] || state
 
@@ -31,15 +34,15 @@ export default function LiveWatch() {
   const image = currentModel?.image
   const video = currentModel?.video
 
-  /*
-   * Load HLS stream
-   */
+  /* =========================
+     LOAD HLS STREAM
+  ========================= */
+
   const loadStream = useCallback((streamUrl) => {
     const videoElement = videoRef.current
 
     if (!videoElement || !streamUrl) return
 
-    // Destroy previous HLS instance
     if (hlsRef.current) {
       hlsRef.current.destroy()
       hlsRef.current = null
@@ -48,8 +51,6 @@ export default function LiveWatch() {
     videoElement.pause()
     videoElement.removeAttribute('src')
     videoElement.load()
-
-    changingStream.current = true
 
     if (Hls.isSupported()) {
       const hls = new Hls({
@@ -63,30 +64,29 @@ export default function LiveWatch() {
       hls.attachMedia(videoElement)
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        videoElement.muted = isMuted
+
         videoElement.play().catch(() => {})
-        changingStream.current = false
       })
 
       hls.on(Hls.Events.ERROR, (_event, data) => {
         console.error('HLS error:', data)
 
-        if (data?.fatal) {
-          switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              console.log('Trying to recover HLS network error...')
-              hls.startLoad()
-              break
+        if (!data?.fatal) return
 
-            case Hls.ErrorTypes.MEDIA_ERROR:
-              console.log('Trying to recover HLS media error...')
-              hls.recoverMediaError()
-              break
+        switch (data.type) {
+          case Hls.ErrorTypes.NETWORK_ERROR:
+            hls.startLoad()
+            break
 
-            default:
-              hls.destroy()
-              hlsRef.current = null
-              break
-          }
+          case Hls.ErrorTypes.MEDIA_ERROR:
+            hls.recoverMediaError()
+            break
+
+          default:
+            hls.destroy()
+            hlsRef.current = null
+            break
         }
       })
     } else if (
@@ -95,26 +95,26 @@ export default function LiveWatch() {
       )
     ) {
       videoElement.src = streamUrl
-
-      const playVideo = () => {
-        videoElement.play().catch(() => {})
-        changingStream.current = false
-      }
+      videoElement.muted = isMuted
 
       videoElement.addEventListener(
         'loadedmetadata',
-        playVideo,
+        () => {
+          videoElement.play().catch(() => {})
+        },
         { once: true }
       )
     } else {
-      changingStream.current = false
-      console.error('HLS is not supported by this browser.')
+      console.error(
+        'HLS is not supported by this browser.'
+      )
     }
-  }, [])
+  }, [isMuted])
 
-  /*
-   * Load current live stream
-   */
+  /* =========================
+     LOAD CURRENT STREAM
+  ========================= */
+
   useEffect(() => {
     if (!video) return
 
@@ -128,9 +128,105 @@ export default function LiveWatch() {
     }
   }, [video, loadStream])
 
-  /*
-   * Go to next live stream
-   */
+  /* =========================
+     MUTE / UNMUTE
+  ========================= */
+
+  const toggleMute = () => {
+    const videoElement = videoRef.current
+
+    if (!videoElement) return
+
+    const newMutedState = !videoElement.muted
+
+    videoElement.muted = newMutedState
+
+    setIsMuted(newMutedState)
+  }
+
+  /* =========================
+     FULLSCREEN
+  ========================= */
+
+  const toggleFullscreen = async () => {
+    const videoElement = videoRef.current
+
+    if (!videoElement) return
+
+    try {
+      if (
+        document.fullscreenElement ||
+        document.webkitFullscreenElement
+      ) {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen()
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen()
+        }
+
+        return
+      }
+
+      if (videoElement.requestFullscreen) {
+        await videoElement.requestFullscreen()
+        return
+      }
+
+      if (videoElement.webkitEnterFullscreen) {
+        videoElement.webkitEnterFullscreen()
+      }
+    } catch (error) {
+      console.error(
+        'Fullscreen error:',
+        error
+      )
+    }
+  }
+
+  /* =========================
+     FULLSCREEN STATE
+  ========================= */
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const fullscreen =
+        !!document.fullscreenElement ||
+        !!document.webkitFullscreenElement
+
+      setIsFullscreen(fullscreen)
+
+      if (videoRef.current) {
+        videoRef.current.controls = fullscreen
+      }
+    }
+
+    document.addEventListener(
+      'fullscreenchange',
+      handleFullscreenChange
+    )
+
+    document.addEventListener(
+      'webkitfullscreenchange',
+      handleFullscreenChange
+    )
+
+    return () => {
+      document.removeEventListener(
+        'fullscreenchange',
+        handleFullscreenChange
+      )
+
+      document.removeEventListener(
+        'webkitfullscreenchange',
+        handleFullscreenChange
+      )
+    }
+  }, [])
+
+  /* =========================
+     NEXT LIVE
+  ========================= */
+
   const nextLive = useCallback(() => {
     if (!models.length) return
 
@@ -138,14 +234,13 @@ export default function LiveWatch() {
       return
     }
 
-    const nextIndex = currentIndex + 1
-
-    setCurrentIndex(nextIndex)
+    setCurrentIndex(currentIndex + 1)
   }, [currentIndex, models.length])
 
-  /*
-   * Go to previous live stream
-   */
+  /* =========================
+     PREVIOUS LIVE
+  ========================= */
+
   const previousLive = useCallback(() => {
     if (!models.length) return
 
@@ -153,14 +248,13 @@ export default function LiveWatch() {
       return
     }
 
-    const previousIndex = currentIndex - 1
-
-    setCurrentIndex(previousIndex)
+    setCurrentIndex(currentIndex - 1)
   }, [currentIndex, models.length])
 
-  /*
-   * Touch swipe
-   */
+  /* =========================
+     SWIPE
+  ========================= */
+
   const handleTouchStart = (e) => {
     const touch = e.touches[0]
 
@@ -187,28 +281,25 @@ export default function LiveWatch() {
     touchStartY.current = null
     touchStartX.current = null
 
-    // Ignore mostly-horizontal swipes
     if (Math.abs(deltaX) > Math.abs(deltaY)) {
       return
     }
 
-    // Minimum swipe distance
     if (Math.abs(deltaY) < 60) {
       return
     }
 
     if (deltaY < 0) {
-      // Swipe UP = next live
       nextLive()
     } else {
-      // Swipe DOWN = previous live
       previousLive()
     }
   }
 
-  /*
-   * Keyboard navigation
-   */
+  /* =========================
+     KEYBOARD
+  ========================= */
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'ArrowUp') {
@@ -224,7 +315,10 @@ export default function LiveWatch() {
       }
     }
 
-    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener(
+      'keydown',
+      handleKeyDown
+    )
 
     return () => {
       window.removeEventListener(
@@ -232,49 +326,16 @@ export default function LiveWatch() {
         handleKeyDown
       )
     }
-  }, [nextLive, previousLive, navigate])
+  }, [
+    nextLive,
+    previousLive,
+    navigate,
+  ])
 
-  /*
-   * Fullscreen only the video player
-   */
-  const toggleFullscreen = async () => {
-    const videoElement = videoRef.current
+  /* =========================
+     NO STREAM
+  ========================= */
 
-    if (!videoElement) return
-
-    try {
-      if (document.fullscreenElement) {
-        await document.exitFullscreen()
-        return
-      }
-
-      if (videoElement.requestFullscreen) {
-        await videoElement.requestFullscreen()
-        return
-      }
-
-      // iPhone / Safari
-      if (videoElement.webkitEnterFullscreen) {
-        videoElement.webkitEnterFullscreen()
-      }
-    } catch (error) {
-      console.error(
-        'Fullscreen error:',
-        error
-      )
-    }
-  }
-
-  /*
-   * Prevent browser image/video dragging
-   */
-  const preventDrag = (e) => {
-    e.preventDefault()
-  }
-
-  /*
-   * No stream selected
-   */
   if (!video) {
     return (
       <main className="live-watch-page">
@@ -282,7 +343,7 @@ export default function LiveWatch() {
           onClick={() => navigate('/live')}
           className="back-btn"
         >
-          ← Back
+          ←
         </button>
 
         <p>Live stream not found.</p>
@@ -296,7 +357,13 @@ export default function LiveWatch() {
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
+
+      {/* =========================
+          HEADER
+      ========================= */}
+
       <header className="live-watch-header">
+
         <button
           onClick={() => navigate('/live')}
           className="back-btn"
@@ -307,32 +374,73 @@ export default function LiveWatch() {
         <h1>
           {title || 'Live'}
         </h1>
+
       </header>
 
+      {/* =========================
+          PLAYER
+      ========================= */}
+
       <div className="live-player">
+
         <video
           ref={videoRef}
           autoPlay
           playsInline
           poster={image}
-          controls
           preload="auto"
-          onDragStart={preventDrag}
-          onContextMenu={(e) => e.preventDefault()}
+          controls={isFullscreen}
+          muted={isMuted}
+          onContextMenu={(e) =>
+            e.preventDefault()
+          }
+          onDragStart={(e) =>
+            e.preventDefault()
+          }
         />
 
-        <div className="live-player-controls">
-          <button
-            type="button"
-            onClick={toggleFullscreen}
-            className="fullscreen-btn"
-          >
-            ⛶
-          </button>
-        </div>
+        {/* =========================
+            MUTE BUTTON
+        ========================= */}
+
+        <button
+          type="button"
+          className="live-mute-btn"
+          onClick={toggleMute}
+          aria-label={
+            isMuted
+              ? 'Unmute'
+              : 'Mute'
+          }
+        >
+          {isMuted ? '🔇' : '🔊'}
+        </button>
+
+        {/* =========================
+            FULLSCREEN BUTTON
+        ========================= */}
+
+        <button
+          type="button"
+          className="live-fullscreen-btn"
+          onClick={toggleFullscreen}
+          aria-label={
+            isFullscreen
+              ? 'Exit fullscreen'
+              : 'Fullscreen'
+          }
+        >
+          {isFullscreen ? '⛶' : '⛶'}
+        </button>
+
       </div>
 
+      {/* =========================
+          INFO
+      ========================= */}
+
       <div className="live-watch-info">
+
         <h2>
           {title || 'Live'}
         </h2>
@@ -340,14 +448,20 @@ export default function LiveWatch() {
         <span>
           🔴 LIVE
         </span>
+
       </div>
+
+      {/* =========================
+          POSITION
+      ========================= */}
 
       {models.length > 1 && (
         <div className="live-position">
           {currentIndex + 1} / {models.length}
         </div>
       )}
+
     </main>
   )
 }
-
+```
