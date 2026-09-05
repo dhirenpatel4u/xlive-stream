@@ -14,6 +14,7 @@ export default function LiveWatch() {
 
   const state = location.state || {}
 
+  // Full live model list passed from Live.jsx
   const models = Array.isArray(state.models)
     ? state.models
     : []
@@ -37,78 +38,96 @@ export default function LiveWatch() {
      LOAD HLS STREAM
   ========================= */
 
-  const loadStream = useCallback((streamUrl) => {
-    const videoElement = videoRef.current
+  const loadStream = useCallback(
+    (streamUrl) => {
+      const videoElement = videoRef.current
 
-    if (!videoElement || !streamUrl) return
+      if (!videoElement || !streamUrl) return
 
-    if (hlsRef.current) {
-      hlsRef.current.destroy()
-      hlsRef.current = null
-    }
+      // Destroy previous HLS instance
+      if (hlsRef.current) {
+        hlsRef.current.destroy()
+        hlsRef.current = null
+      }
 
-    videoElement.pause()
-    videoElement.removeAttribute('src')
-    videoElement.load()
+      videoElement.pause()
+      videoElement.removeAttribute('src')
+      videoElement.load()
 
-    if (Hls.isSupported()) {
-      const hls = new Hls({
-        enableWorker: true,
-        lowLatencyMode: true,
-      })
+      /* =========================
+         HLS.JS
+      ========================= */
 
-      hlsRef.current = hls
+      if (Hls.isSupported()) {
+        const hls = new Hls({
+          enableWorker: true,
+          lowLatencyMode: true,
+        })
 
-      hls.loadSource(streamUrl)
-      hls.attachMedia(videoElement)
+        hlsRef.current = hls
 
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        hls.loadSource(streamUrl)
+        hls.attachMedia(videoElement)
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          videoElement.muted = isMuted
+
+          videoElement.play().catch(() => {})
+        })
+
+        hls.on(Hls.Events.ERROR, (_event, data) => {
+          console.error('HLS error:', data)
+
+          if (!data?.fatal) return
+
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              hls.startLoad()
+              break
+
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              hls.recoverMediaError()
+              break
+
+            default:
+              hls.destroy()
+              hlsRef.current = null
+              break
+          }
+        })
+
+        return
+      }
+
+      /* =========================
+         NATIVE HLS
+      ========================= */
+
+      if (
+        videoElement.canPlayType(
+          'application/vnd.apple.mpegurl'
+        )
+      ) {
+        videoElement.src = streamUrl
         videoElement.muted = isMuted
 
-        videoElement.play().catch(() => {})
-      })
+        videoElement.addEventListener(
+          'loadedmetadata',
+          () => {
+            videoElement.play().catch(() => {})
+          },
+          { once: true }
+        )
 
-      hls.on(Hls.Events.ERROR, (_event, data) => {
-        console.error('HLS error:', data)
+        return
+      }
 
-        if (!data?.fatal) return
-
-        switch (data.type) {
-          case Hls.ErrorTypes.NETWORK_ERROR:
-            hls.startLoad()
-            break
-
-          case Hls.ErrorTypes.MEDIA_ERROR:
-            hls.recoverMediaError()
-            break
-
-          default:
-            hls.destroy()
-            hlsRef.current = null
-            break
-        }
-      })
-    } else if (
-      videoElement.canPlayType(
-        'application/vnd.apple.mpegurl'
-      )
-    ) {
-      videoElement.src = streamUrl
-      videoElement.muted = isMuted
-
-      videoElement.addEventListener(
-        'loadedmetadata',
-        () => {
-          videoElement.play().catch(() => {})
-        },
-        { once: true }
-      )
-    } else {
       console.error(
         'HLS is not supported by this browser.'
       )
-    }
-  }, [isMuted])
+    },
+    [isMuted]
+  )
 
   /* =========================
      LOAD CURRENT STREAM
@@ -153,10 +172,11 @@ export default function LiveWatch() {
     if (!videoElement) return
 
     try {
-      if (
+      const currentlyFullscreen =
         document.fullscreenElement ||
         document.webkitFullscreenElement
-      ) {
+
+      if (currentlyFullscreen) {
         if (document.exitFullscreen) {
           await document.exitFullscreen()
         } else if (document.webkitExitFullscreen) {
@@ -166,11 +186,13 @@ export default function LiveWatch() {
         return
       }
 
+      // Fullscreen ONLY the video
       if (videoElement.requestFullscreen) {
         await videoElement.requestFullscreen()
         return
       }
 
+      // iPhone / Safari
       if (videoElement.webkitEnterFullscreen) {
         videoElement.webkitEnterFullscreen()
       }
@@ -233,7 +255,7 @@ export default function LiveWatch() {
       return
     }
 
-    setCurrentIndex(currentIndex + 1)
+    setCurrentIndex((prev) => prev + 1)
   }, [currentIndex, models.length])
 
   /* =========================
@@ -247,11 +269,11 @@ export default function LiveWatch() {
       return
     }
 
-    setCurrentIndex(currentIndex - 1)
+    setCurrentIndex((prev) => prev - 1)
   }, [currentIndex, models.length])
 
   /* =========================
-     SWIPE
+     TOUCH START
   ========================= */
 
   const handleTouchStart = (e) => {
@@ -260,6 +282,10 @@ export default function LiveWatch() {
     touchStartY.current = touch.clientY
     touchStartX.current = touch.clientX
   }
+
+  /* =========================
+     TOUCH END
+  ========================= */
 
   const handleTouchEnd = (e) => {
     if (
@@ -280,23 +306,29 @@ export default function LiveWatch() {
     touchStartY.current = null
     touchStartX.current = null
 
+    // Ignore horizontal swipes
     if (Math.abs(deltaX) > Math.abs(deltaY)) {
       return
     }
 
+    // Ignore small movements
     if (Math.abs(deltaY) < 60) {
       return
     }
 
+    // Swipe UP = next live
     if (deltaY < 0) {
       nextLive()
-    } else {
+    }
+
+    // Swipe DOWN = previous live
+    else {
       previousLive()
     }
   }
 
   /* =========================
-     KEYBOARD
+     KEYBOARD CONTROLS
   ========================= */
 
   useEffect(() => {
@@ -342,13 +374,17 @@ export default function LiveWatch() {
           onClick={() => navigate('/live')}
           className="back-btn"
         >
-          ←
+          ← Back
         </button>
 
         <p>Live stream not found.</p>
       </main>
     )
   }
+
+  /* =========================
+     UI
+  ========================= */
 
   return (
     <main
@@ -358,7 +394,7 @@ export default function LiveWatch() {
     >
 
       {/* =========================
-          HEADER
+          TOP HEADER
       ========================= */}
 
       <header className="live-watch-header">
@@ -366,6 +402,7 @@ export default function LiveWatch() {
         <button
           onClick={() => navigate('/live')}
           className="back-btn"
+          type="button"
         >
           ←
         </button>
@@ -376,8 +413,9 @@ export default function LiveWatch() {
 
       </header>
 
+
       {/* =========================
-          PLAYER
+          FULLSCREEN VIDEO
       ========================= */}
 
       <div className="live-player">
@@ -390,52 +428,75 @@ export default function LiveWatch() {
           preload="auto"
           controls={isFullscreen}
           muted={isMuted}
+
           onContextMenu={(e) =>
             e.preventDefault()
           }
+
           onDragStart={(e) =>
             e.preventDefault()
           }
         />
 
-        {/* =========================
-            MUTE BUTTON
-        ========================= */}
-
-        <button
-          type="button"
-          className="live-mute-btn"
-          onClick={toggleMute}
-          aria-label={
-            isMuted
-              ? 'Unmute'
-              : 'Mute'
-          }
-        >
-          {isMuted ? '🔇' : '🔊'}
-        </button>
 
         {/* =========================
-            FULLSCREEN BUTTON
+            REELS STYLE CONTROLS
         ========================= */}
 
-        <button
-          type="button"
-          className="live-fullscreen-btn"
-          onClick={toggleFullscreen}
-          aria-label={
-            isFullscreen
-              ? 'Exit fullscreen'
-              : 'Fullscreen'
-          }
-        >
-          {isFullscreen ? '⛶' : '⛶'}
-        </button>
+        <div className="live-player-controls">
+
+          {/* MUTE */}
+
+          <button
+            type="button"
+            className="live-mute-btn"
+            onClick={toggleMute}
+            aria-label={
+              isMuted
+                ? 'Unmute'
+                : 'Mute'
+            }
+          >
+            <img
+              src={
+                isMuted
+                  ? '/assets/unmute.png'
+                  : '/assets/mute.png'
+              }
+              alt={
+                isMuted
+                  ? 'Unmute'
+                  : 'Mute'
+              }
+            />
+          </button>
+
+
+          {/* FULLSCREEN */}
+
+          <button
+            type="button"
+            className="live-fullscreen-btn"
+            onClick={toggleFullscreen}
+            aria-label={
+              isFullscreen
+                ? 'Exit fullscreen'
+                : 'Fullscreen'
+            }
+          >
+            <img
+              src="/assets/fullscreen-logo.png"
+              alt="Fullscreen"
+            />
+          </button>
+
+        </div>
 
       </div>
 
+
       {/* =========================
-          INFO
+          LIVE INFO
       ========================= */}
 
       <div className="live-watch-info">
@@ -450,6 +511,7 @@ export default function LiveWatch() {
 
       </div>
 
+
       {/* =========================
           POSITION
       ========================= */}
@@ -463,3 +525,4 @@ export default function LiveWatch() {
     </main>
   )
 }
+
