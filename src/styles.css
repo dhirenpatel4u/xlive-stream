@@ -20,9 +20,7 @@ button {
   font: inherit;
 }
 
-/* =========================================================
-   REELS APP
-========================================================= */
+/* REELS */
 
 .reels-app {
   position: fixed;
@@ -83,9 +81,7 @@ button {
   padding-bottom: 3px;
 }
 
-/* =========================================================
-   BRAND LOGO
-========================================================= */
+/* LOGO */
 
 .brand-logo {
   position: absolute;
@@ -101,9 +97,7 @@ button {
   display: block;
 }
 
-/* =========================================================
-   LIVE BUTTON
-========================================================= */
+/* LIVE BUTTON */
 
 .live-button {
   position: fixed;
@@ -137,9 +131,7 @@ button {
   background: rgba(255, 0, 0, 0.3);
 }
 
-/* =========================================================
-   TOP CONTROLS
-========================================================= */
+/* CONTROLS */
 
 .top-controls {
   position: fixed;
@@ -179,9 +171,7 @@ button {
   cursor: not-allowed;
 }
 
-/* =========================================================
-   PROGRESS BAR
-========================================================= */
+/* PROGRESS */
 
 .global-progress-container {
   position: fixed;
@@ -200,9 +190,7 @@ button {
   width: 0;
 }
 
-/* =========================================================
-   LOADERS
-========================================================= */
+/* LOADERS */
 
 .spinner {
   position: absolute;
@@ -238,9 +226,7 @@ button {
   }
 }
 
-/* =========================================================
-   SEEK FLASH
-========================================================= */
+/* SEEK */
 
 .seek-flash {
   position: fixed;
@@ -255,9 +241,7 @@ button {
   pointer-events: none;
 }
 
-/* =========================================================
-   REEL COUNTER
-========================================================= */
+/* COUNTER */
 
 .reel-counter {
   position: fixed;
@@ -271,9 +255,7 @@ button {
   border-radius: 8px;
 }
 
-/* =========================================================
-   LOADING / ERROR
-========================================================= */
+/* ERROR */
 
 .loading-screen,
 .error-screen {
@@ -317,9 +299,7 @@ button {
   font-weight: bold;
 }
 
-/* =========================================================
-   LOGIN PAGE
-========================================================= */
+/* LOGIN */
 
 .login-page {
   min-height: 100%;
@@ -328,7 +308,6 @@ button {
   align-items: center;
   background: #f0f0f0;
   padding: 20px;
-  overflow-y: auto;
 }
 
 .login-card {
@@ -392,9 +371,7 @@ button {
   margin: 0 0 12px;
 }
 
-/* =========================================================
-   LIVE PAGE
-========================================================= */
+/* LIVE PAGE */
 
 .live-page {
   position: fixed;
@@ -403,10 +380,7 @@ button {
   overflow-x: hidden;
   background: #f4f4f4;
   color: #111;
-  -webkit-overflow-scrolling: touch;
 }
-
-/* Header */
 
 .live-header {
   height: 70px;
@@ -433,8 +407,6 @@ button {
   color: #111;
 }
 
-/* Back button */
-
 .back-btn {
   border: 0;
   background: #111;
@@ -447,23 +419,19 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
 }
 
 .back-btn:hover {
   background: #333;
 }
 
-/* Status */
-
 .live-status {
   text-align: center;
   padding: 35px 20px;
   color: #666;
-  font-size: 15px;
 }
 
-/* Live grid */
+/* LIVE GRID */
 
 .live-grid {
   width: 100%;
@@ -475,7 +443,7 @@ button {
   padding: 20px;
 }
 
-/* Live card */
+/* LIVE CARD */
 
 .live-card {
   position: relative;
@@ -489,9 +457,7 @@ button {
   padding: 0;
   margin: 0;
   text-align: left;
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -504,7 +470,7 @@ button {
   transform: scale(0.98);
 }
 
-/* Image */
+/* LIVE IMAGE */
 
 .live-image-wrapper {
   position: relative;
@@ -521,7 +487,7 @@ button {
   display: block;
 }
 
-/* Live badge */
+/* LIVE BADGE */
 
 .live-badge {
   position: absolute;
@@ -536,7 +502,7 @@ button {
   line-height: 1;
 }
 
-/* Model title */
+/* MODEL TITLE */
 
 .live-card h2 {
   margin: 0;
@@ -549,9 +515,7 @@ button {
   text-overflow: ellipsis;
 }
 
-/* =========================================================
-   LIVE WATCH PAGE
-========================================================= */
+/* LIVE WATCH */
 
 .live-watch-page {
   position: fixed;
@@ -560,10 +524,7 @@ button {
   overflow-x: hidden;
   background: #000;
   color: #fff;
-  -webkit-overflow-scrolling: touch;
 }
-
-/* Watch header */
 
 .live-watch-header {
   height: 65px;
@@ -586,8 +547,6 @@ button {
   text-overflow: ellipsis;
 }
 
-/* Player */
-
 .live-player {
   width: 100%;
   max-width: 1100px;
@@ -604,8 +563,6 @@ button {
   aspect-ratio: 16 / 9;
   object-fit: contain;
 }
-
-/* Watch information */
 
 .live-watch-info {
   width: 100%;
@@ -628,12 +585,9 @@ button {
   font-weight: 700;
 }
 
-/* =========================================================
-   MOBILE
-========================================================= */
+/* MOBILE */
 
 @media (max-width: 767px) {
-
   .brand-logo {
     top: 12px;
     left: 12px;
@@ -666,8 +620,6 @@ button {
     width: 58px;
     height: 58px;
   }
-
-  /* Live */
 
   .live-header {
     height: 60px;
@@ -706,8 +658,6 @@ button {
     font-size: 10px;
   }
 
-  /* Watch */
-
   .live-watch-header {
     height: 58px;
     padding: 8px 10px;
@@ -732,17 +682,10 @@ button {
   }
 }
 
-/* =========================================================
-   DESKTOP HOVER
-========================================================= */
+/* DESKTOP */
 
 @media (min-width: 768px) {
-
   .control-btn:hover {
     background: rgba(255, 255, 255, 0.2);
-  }
-
-  .live-card:hover {
-    transform: scale(1.03);
   }
 }
