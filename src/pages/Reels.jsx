@@ -1,3 +1,4 @@
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import ControlButton from '../components/ControlButton'
@@ -56,6 +57,10 @@ export default function Reels() {
 
   // Prevent speed changes from causing spinner.
   const changingSpeed = useRef(false)
+
+  // Used to prevent stale video events from
+  // changing the current loading/error state.
+  const videoRequestId = useRef(0)
 
   // --------------------------------------------------
   // LOAD VIDEO DATA
@@ -130,6 +135,10 @@ export default function Reels() {
       longPressActive.current = false
       setHoldSpeedActive(false)
 
+      // Every navigation creates a new video request state.
+      videoRequestId.current += 1
+
+      setError('')
       setVideoLoading(true)
       setProgress(0)
 
@@ -175,8 +184,10 @@ export default function Reels() {
   // --------------------------------------------------
   // CURRENT VIDEO SETUP
   //
-  // Current video loads normally.
-  // Other rendered videos do NOT preload.
+  // Only current visible video loads.
+  // Other visible video elements use preload="none".
+  //
+  // NO POSTER.
   // --------------------------------------------------
 
   useEffect(() => {
@@ -184,6 +195,16 @@ export default function Reels() {
 
     const active = videoRefs.current[index]
 
+    if (!active) return
+
+    // New request generation.
+    videoRequestId.current += 1
+
+    setError('')
+    setProgress(0)
+    setVideoLoading(true)
+
+    // Stop every other rendered video.
     videoRefs.current.forEach((v, i) => {
       if (v && i !== index) {
         try {
@@ -193,13 +214,21 @@ export default function Reels() {
       }
     })
 
-    if (active) {
+    try {
       active.muted = muted
       active.playbackRate = speed
 
-      setVideoLoading(true)
+      // Force the current video to load.
+      active.load()
 
-      active.play().catch(() => {})
+      active.play().catch(() => {
+        // Some browsers reject autoplay temporarily.
+        // onError/onCanPlay/onPlaying remain responsible
+        // for the actual loading state.
+      })
+    } catch {
+      setVideoLoading(false)
+      setError('Video could not be loaded.')
     }
   }, [index, videos, order])
 
@@ -210,13 +239,10 @@ export default function Reels() {
   //   Full normal loading.
   //
   // Next 2:
-  //   Preload approximately 5 seconds.
+  //   Background preload approximately 5 seconds.
   //
   // Previous / further videos:
   //   No preload.
-  //
-  // This is intentionally limited to 2 so that
-  // bandwidth is focused on the next swipe targets.
   // --------------------------------------------------
 
   useEffect(() => {
@@ -224,10 +250,7 @@ export default function Reels() {
 
     const nextIndexes = []
 
-    // -----------------------------------------------
-    // GET NEXT 2 VIDEOS
-    // -----------------------------------------------
-
+    // Get next 2 videos.
     for (let n = 1; n <= 2; n++) {
       const position =
         (index + n) % order.length
@@ -247,14 +270,22 @@ export default function Reels() {
       const videoIndex = Number(key)
 
       if (!nextIndexes.includes(videoIndex)) {
-        const v = preloadRefs.current[videoIndex]
+        const item = preloadRefs.current[videoIndex]
 
-        if (v) {
+        if (item?.video) {
           try {
-            v.pause()
-            v.removeAttribute('src')
-            v.load()
+            item.video.pause()
+            item.video.removeAttribute('src')
+            item.video.load()
           } catch {}
+        }
+
+        if (item?.timer) {
+          clearInterval(item.timer)
+        }
+
+        if (item?.timeout) {
+          clearTimeout(item.timeout)
         }
 
         delete preloadRefs.current[videoIndex]
@@ -292,11 +323,7 @@ export default function Reels() {
         'true'
       )
 
-      // Start loading the next video.
       preloadVideo.src = data.video
-
-      preloadRefs.current[videoIndex] =
-        preloadVideo
 
       let stopped = false
 
@@ -313,8 +340,6 @@ export default function Reels() {
               preloadVideo.buffered.length - 1
             )
 
-          // Stop once approximately 5 seconds
-          // are buffered.
           if (bufferedEnd >= 5) {
             stopped = true
 
@@ -343,11 +368,10 @@ export default function Reels() {
         stopAfterFiveSeconds
       )
 
-      // Start network loading.
+      // Start loading immediately.
       preloadVideo.load()
 
-      // Some browsers don't fire progress
-      // frequently enough, so check manually.
+      // Check buffered amount frequently.
       const checkTimer = setInterval(() => {
         if (stopped) {
           clearInterval(checkTimer)
@@ -358,9 +382,15 @@ export default function Reels() {
       }, 250)
 
       // Safety timeout.
-      setTimeout(() => {
+      const safetyTimeout = setTimeout(() => {
         clearInterval(checkTimer)
       }, 15000)
+
+      preloadRefs.current[videoIndex] = {
+        video: preloadVideo,
+        timer: checkTimer,
+        timeout: safetyTimeout
+      }
     })
 
     // -----------------------------------------------
@@ -370,14 +400,22 @@ export default function Reels() {
     return () => {
       Object.keys(preloadRefs.current).forEach(
         (key) => {
-          const v = preloadRefs.current[key]
+          const item = preloadRefs.current[key]
 
-          if (v) {
+          if (item?.video) {
             try {
-              v.pause()
-              v.removeAttribute('src')
-              v.load()
+              item.video.pause()
+              item.video.removeAttribute('src')
+              item.video.load()
             } catch {}
+          }
+
+          if (item?.timer) {
+            clearInterval(item.timer)
+          }
+
+          if (item?.timeout) {
+            clearTimeout(item.timeout)
           }
         }
       )
@@ -790,15 +828,23 @@ export default function Reels() {
       Object.keys(
         preloadRefs.current
       ).forEach((key) => {
-        const v =
+        const item =
           preloadRefs.current[key]
 
-        if (v) {
+        if (item?.video) {
           try {
-            v.pause()
-            v.removeAttribute('src')
-            v.load()
+            item.video.pause()
+            item.video.removeAttribute('src')
+            item.video.load()
           } catch {}
+        }
+
+        if (item?.timer) {
+          clearInterval(item.timer)
+        }
+
+        if (item?.timeout) {
+          clearTimeout(item.timeout)
         }
       })
 
@@ -916,32 +962,17 @@ export default function Reels() {
                       el
                   }}
 
-                  src={data.video}
-
                   /*
-                   * ONLY CURRENT VIDEO:
-                   * Loads normally.
+                   * NO POSTER.
                    *
-                   * Previous and next visible
-                   * videos do not independently
-                   * preload their video source.
+                   * Only the current video is
+                   * allowed to preload.
                    */
+                  src={data.video}
                   preload={
                     i === index
                       ? 'auto'
                       : 'none'
-                  }
-
-                  /*
-                   * Only current video receives
-                   * the poster. This avoids making
-                   * all rendered videos compete
-                   * with video loading.
-                   */
-                  poster={
-                    i === index
-                      ? data.image
-                      : undefined
                   }
 
                   playsInline
@@ -990,30 +1021,37 @@ export default function Reels() {
                   // --------------------------------
 
                   onLoadStart={() => {
-                    if (i === index) {
-                      setVideoLoading(
-                        true
-                      )
-                    }
+                    if (i !== index) return
+
+                    setVideoLoading(true)
+                    setError('')
+                  }}
+
+                  onLoadedMetadata={(e) => {
+                    if (i !== index) return
+
+                    const video =
+                      e.currentTarget
+
+                    video.muted = muted
+                    video.playbackRate = speed
                   }}
 
                   onCanPlay={() => {
-                    if (i === index) {
-                      setVideoLoading(
-                        false
-                      )
-                    }
+                    if (i !== index) return
+
+                    setVideoLoading(false)
+                    setError('')
                   }}
 
                   onPlaying={() => {
-                    if (i === index) {
-                      setVideoLoading(
-                        false
-                      )
+                    if (i !== index) return
 
-                      changingSpeed.current =
-                        false
-                    }
+                    setVideoLoading(false)
+                    setError('')
+
+                    changingSpeed.current =
+                      false
                   }}
 
                   onWaiting={() => {
@@ -1022,22 +1060,31 @@ export default function Reels() {
                       !changingSpeed.current &&
                       !longPressActive.current
                     ) {
-                      setVideoLoading(
-                        true
-                      )
+                      setVideoLoading(true)
                     }
                   }}
 
-                  onError={() => {
+                  onStalled={() => {
                     if (i === index) {
-                      setVideoLoading(
-                        false
-                      )
-
-                      setError(
-                        'Video could not be loaded.'
-                      )
+                      setVideoLoading(true)
                     }
+                  }}
+
+                  onSuspend={() => {
+                    /*
+                     * Do not show an error on suspend.
+                     * Browsers can legitimately suspend
+                     * network loading temporarily.
+                     */
+                  }}
+
+                  onError={() => {
+                    if (i !== index) return
+
+                    setVideoLoading(false)
+                    setError(
+                      'Video could not be loaded.'
+                    )
                   }}
 
                   onTimeUpdate={(e) => {
@@ -1100,7 +1147,7 @@ export default function Reels() {
       </div>
 
       {/* VIDEO BUFFER SPINNER */}
-      {videoLoading && (
+      {videoLoading && !error && (
         <div className="spinner">
           <div className="loader" />
         </div>
@@ -1114,21 +1161,32 @@ export default function Reels() {
 
           <button
             onClick={() => {
-              setError('')
-              setVideoLoading(
-                true
-              )
-
               const v =
                 videoRefs.current[
                   index
                 ]
 
-              if (v) {
-                v.load()
+              setError('')
+              setVideoLoading(true)
+              setProgress(0)
 
-                v.play().catch(
-                  () => {}
+              if (v) {
+                try {
+                  v.load()
+
+                  v.play().catch(
+                    () => {}
+                  )
+                } catch {
+                  setVideoLoading(false)
+                  setError(
+                    'Video could not be loaded.'
+                  )
+                }
+              } else {
+                setVideoLoading(false)
+                setError(
+                  'Video could not be loaded.'
                 )
               }
             }}
