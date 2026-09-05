@@ -5,7 +5,11 @@ import Reels from './pages/Reels'
 import Live from './pages/Live'
 
 function Protected({ children, loggedIn }) {
-  return loggedIn ? children : <Navigate to="/login" replace />
+  if (!loggedIn) {
+    return <Navigate to="/login" replace />
+  }
+
+  return children
 }
 
 export default function App() {
@@ -15,12 +19,15 @@ export default function App() {
 
   return (
     <Routes>
+
       <Route
         path="/login"
         element={
-          loggedIn
-            ? <Navigate to="/" replace />
-            : <Login onLogin={() => setLoggedIn(true)} />
+          loggedIn ? (
+            <Navigate to="/" replace />
+          ) : (
+            <Login onLogin={() => setLoggedIn(true)} />
+          )
         }
       />
 
@@ -42,7 +49,11 @@ export default function App() {
         }
       />
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route
+        path="*"
+        element={<Navigate to="/" replace />}
+      />
+
     </Routes>
   )
 }
