@@ -1,8 +1,4 @@
-
-/* =========================================================
-   GLOBAL
-========================================================= */
-
+```css
 * {
   box-sizing: border-box;
 }
@@ -11,902 +7,743 @@ html,
 body,
 #root {
   margin: 0;
-  padding: 0;
-
   width: 100%;
-  min-height: 100%;
-
+  height: 100%;
   background: #000;
 }
 
 body {
-  font-family: Arial, Helvetica, sans-serif;
-
-  color: #fff;
-
-  overflow-x: hidden;
+  font-family: Arial, sans-serif;
+  overflow: hidden;
 }
 
+button {
+  font: inherit;
+}
 
-/* =========================================================
-   REELS APP
-========================================================= */
+/* =========================
+   REELS
+========================= */
 
 .reels-app {
   position: fixed;
-
   inset: 0;
-
-  width: 100vw;
-  height: 100vh;
-  height: 100dvh;
-
   background: #000;
-
   overflow: hidden;
-
-  touch-action: none;
+  color: #fff;
 }
-
-
-/* =========================================================
-   VIDEO CONTAINER
-========================================================= */
 
 .video-container {
   position: absolute;
-
   inset: 0;
-
-  width: 100%;
-  height: 100%;
-
-  background: #000;
-
   overflow: hidden;
+  background: #000;
 }
-
-
-/* =========================================================
-   VIDEO WRAPPER
-========================================================= */
 
 .video-wrapper {
   position: absolute;
-
   inset: 0;
-
-  width: 100%;
-  height: 100%;
-
-  background: #000;
-
+  display: flex;
+  justify-content: flex-end;
   overflow: hidden;
-
-  transition:
-    transform 0.25s ease;
+  transition: transform 0.35s ease;
+  will-change: transform;
+  backface-visibility: hidden;
 }
-
-
-/* =========================================================
-   REELS VIDEO
-========================================================= */
 
 .video-wrapper video {
   width: 100%;
   height: 100%;
-
-  display: block;
-
   background: #000;
-
-  object-fit: contain;
-
-  user-select: none;
-
-  -webkit-user-select: none;
-
+  will-change: transform;
   -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
+/* =========================
+   REEL INFO
+========================= */
 
-/* =========================================================
-   REELS TOP CONTROLS
-========================================================= */
+.video-info {
+  position: absolute;
+  bottom: 18px;
+  left: 6px;
+  right: 70px;
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.video-title {
+  color: #fff;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.3;
+  text-shadow: 0 0 5px rgba(0, 0, 0, 0.9);
+  opacity: 0.9;
+  word-break: break-word;
+  padding-bottom: 3px;
+}
+
+/* =========================
+   LOGO
+========================= */
+
+.brand-logo {
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  z-index: 10001;
+  cursor: pointer;
+}
+
+.brand-logo img {
+  width: 100px;
+  height: auto;
+  display: block;
+}
+
+/* =========================
+   LIVE BUTTON
+========================= */
+
+.live-button {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 10001;
+}
+
+.live-button button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: rgba(255, 0, 0, 0.15);
+  color: #fff;
+  padding: 7px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  backdrop-filter: blur(5px);
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.live-button img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.live-button button:hover {
+  background: rgba(255, 0, 0, 0.3);
+}
+
+/* =========================
+   REEL CONTROLS
+========================= */
 
 .top-controls {
   position: fixed;
-
   top: 50%;
   right: 10px;
-
   transform: translateY(-50%);
-
   display: flex;
-
   flex-direction: column;
-
   gap: 10px;
-
   z-index: 10000;
 }
-
-
-/* =========================================================
-   REELS CONTROL BUTTON
-========================================================= */
 
 .control-btn {
   width: 40px;
   height: 40px;
-
   border: none;
-
   border-radius: 0;
-
   background: rgba(0, 0, 0, 0.6);
-
   display: flex;
-
   align-items: center;
   justify-content: center;
-
   cursor: pointer;
-
   color: #fff;
-
   font-size: 14px;
-
   font-weight: bold;
-
   padding: 0;
-
-  margin: 0;
-
-  -webkit-tap-highlight-color: transparent;
 }
-
-
-/* =========================================================
-   REELS CONTROL ICON
-========================================================= */
 
 .control-btn img {
   width: 24px;
   height: 24px;
-
   object-fit: contain;
+}
 
-  display: block;
+.control-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
+/* =========================
+   PROGRESS
+========================= */
+
+.global-progress-container {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 7px;
+  background: rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  z-index: 1000;
+}
+
+.global-progress-bar {
+  height: 100%;
+  background: #3498db;
+  width: 0;
+}
+
+/* =========================
+   LOADERS
+========================= */
+
+.spinner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+}
+
+.loader,
+.big-loader {
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.loader {
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  border-top: 4px solid #fff;
+  width: 40px;
+  height: 40px;
+}
+
+.big-loader {
+  border: 5px solid rgba(255, 255, 255, 0.2);
+  border-top: 5px solid #fff;
+  width: 52px;
+  height: 52px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* =========================
+   SEEK
+========================= */
+
+.seek-flash {
+  position: fixed;
+  bottom: 80px;
+  width: 100%;
+  text-align: center;
+  font-size: 30px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 0 10px #000;
+  z-index: 9999;
   pointer-events: none;
 }
 
+/* =========================
+   REEL COUNTER
+========================= */
 
-/* =========================================================
-   REELS CONTROL ACTIVE
-========================================================= */
-
-.control-btn:active {
-  transform: scale(0.92);
+.reel-counter {
+  position: fixed;
+  top: 15px;
+  right: 125px;
+  z-index: 1000;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(0, 0, 0, 0.25);
+  padding: 5px 7px;
+  border-radius: 8px;
 }
 
+/* =========================
+   LOADING / ERROR
+========================= */
 
-/* =========================================================
-   LONG PRESS SPEED INDICATOR
-========================================================= */
+.loading-screen,
+.error-screen {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  color: #fff;
+  text-align: center;
+  padding: 20px;
+}
 
-.speed-indicator {
-  position: fixed;
+.error-screen button {
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 18px;
+  cursor: pointer;
+}
 
+.error-msg {
+  position: absolute;
   top: 50%;
   left: 50%;
-
   transform: translate(-50%, -50%);
-
-  z-index: 20000;
-
-  padding: 10px 16px;
-
-  background: rgba(0, 0, 0, 0.7);
-
   color: #fff;
+  background: rgba(0, 0, 0, 0.75);
+  padding: 18px;
+  border-radius: 12px;
+  z-index: 1000;
+  text-align: center;
+}
 
-  font-size: 18px;
-
+.error-msg button {
+  margin-top: 12px;
+  border: 0;
+  background: #fff;
+  color: #000;
+  padding: 10px 18px;
+  border-radius: 8px;
   font-weight: bold;
 }
 
-
-/* =========================================================
-   REELS PROGRESS BAR
-========================================================= */
-
-.progress-container {
-  position: absolute;
-
-  left: 0;
-  right: 0;
-
-  bottom: 0;
-
-  height: 4px;
-
-  z-index: 11000;
-
-  background: rgba(255, 255, 255, 0.25);
-}
-
-.progress-bar {
-  height: 100%;
-
-  background: #fff;
-
-  transition: width 0.1s linear;
-}
-
-
-/* =========================================================
-   REELS MOBILE
-========================================================= */
-
-@media (max-width: 767px) {
-
-  .top-controls {
-    right: 7px;
-
-    gap: 8px;
-  }
-
-  .control-btn {
-    width: 38px;
-    height: 38px;
-  }
-
-  .control-btn img {
-    width: 24px;
-    height: 24px;
-  }
-
-}
-
-
-/* =========================================================
-   LOGIN PAGE
-========================================================= */
+/* =========================
+   LOGIN
+========================= */
 
 .login-page {
-  min-height: 100vh;
-  min-height: 100dvh;
-
-  width: 100%;
-
+  min-height: 100%;
   display: flex;
-
-  align-items: center;
   justify-content: center;
-
+  align-items: center;
+  background: #f0f0f0;
   padding: 20px;
-
-  background: #000;
-
-  color: #fff;
 }
 
-.login-box {
-  width: 100%;
-  max-width: 400px;
-
+.login-card {
+  background: #fff;
+  border-radius: 12px;
   padding: 30px;
-
-  background: #111;
-
-  border: 1px solid #222;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  width: 360px;
+  text-align: center;
 }
 
-.login-box img {
-  width: 100%;
-  max-width: 180px;
-
-  display: block;
-
-  margin: 0 auto 25px;
+.login-logo {
+  width: 150px;
+  height: 150px;
+  object-fit: contain;
 }
 
-.login-box input {
-  width: 100%;
+.login-card h1 {
+  margin: 10px 0 20px;
+  font-size: 24px;
+}
 
-  height: 45px;
+.pin-inputs {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
 
-  margin-bottom: 12px;
-
-  padding: 0 12px;
-
-  border: 1px solid #333;
-
-  background: #000;
-
-  color: #fff;
-
+.pin-inputs input {
+  width: 65px;
+  height: 65px;
+  text-align: center;
+  font-size: 25px;
+  border: 2px solid #ccc;
+  border-radius: 9px;
   outline: none;
 }
 
-.login-box button {
-  width: 100%;
-
-  height: 45px;
-
-  border: none;
-
-  background: #fff;
-
-  color: #000;
-
-  cursor: pointer;
-
-  font-weight: bold;
+.pin-inputs input:focus {
+  border-color: #007bff;
 }
 
+.login-submit {
+  margin-top: 20px;
+  padding: 11px 24px;
+  font-size: 16px;
+  background: #007bff;
+  color: #fff;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+}
 
-/* =========================================================
+.login-submit:hover {
+  background: #0056b3;
+}
+
+.login-error {
+  color: #e00000;
+  font-size: 14px;
+  margin: 0 0 12px;
+}
+
+/* =========================
    LIVE PAGE
-========================================================= */
+========================= */
 
 .live-page {
-  min-height: 100vh;
-
-  background: #000;
-
-  color: #fff;
-
-  padding-bottom: 30px;
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #f4f4f4;
+  color: #111;
 }
 
-
-/* =========================================================
-   LIVE HEADER
-========================================================= */
-
 .live-header {
-  position: sticky;
-
-  top: 0;
-
-  z-index: 1000;
-
-  height: 60px;
-
+  height: 70px;
   display: flex;
-
   align-items: center;
-
-  gap: 12px;
-
-  padding: 0 15px;
-
-  background: #000;
-
-  border-bottom: 1px solid #222;
+  gap: 16px;
+  padding: 10px 18px;
+  background: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }
 
 .live-header img {
-  width: 38px;
-  height: 38px;
-
+  height: 48px;
+  width: 48px;
   object-fit: contain;
 }
 
 .live-header h1 {
   margin: 0;
-
-  font-size: 20px;
-
-  font-weight: 600;
+  font-size: 22px;
+  color: #111;
 }
-
-
-/* =========================================================
-   LIVE BACK BUTTON
-========================================================= */
 
 .back-btn {
+  border: 0;
+  background: #111;
+  color: #fff;
+  border-radius: 8px;
   width: 40px;
   height: 40px;
-
-  border: none;
-
-  border-radius: 0;
-
-  background: rgba(255, 255, 255, 0.1);
-
-  color: #fff;
-
+  cursor: pointer;
+  font-size: 20px;
   display: flex;
-
   align-items: center;
   justify-content: center;
-
-  padding: 0;
-
-  cursor: pointer;
-
-  font-size: 22px;
-
-  flex-shrink: 0;
 }
 
-.back-btn:active {
-  transform: scale(0.92);
+.back-btn:hover {
+  background: #333;
 }
-
-
-/* =========================================================
-   LIVE STATUS
-========================================================= */
 
 .live-status {
-  padding: 25px 15px;
-
   text-align: center;
-
-  color: #aaa;
-
-  font-size: 14px;
+  padding: 35px 20px;
+  color: #666;
 }
 
-
-/* =========================================================
+/* =========================
    LIVE GRID
-========================================================= */
+========================= */
 
 .live-grid {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
   display: grid;
-
-  grid-template-columns:
-    repeat(auto-fill, minmax(180px, 1fr));
-
-  gap: 12px;
-
-  padding: 15px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  padding: 20px;
 }
 
-
-/* =========================================================
+/* =========================
    LIVE CARD
-========================================================= */
+========================= */
 
 .live-card {
+  position: relative;
+  width: 100%;
+  min-width: 0;
   background: #111;
-
+  border-radius: 12px;
   overflow: hidden;
-
   cursor: pointer;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
 
-  user-select: none;
+.live-card:hover {
+  transform: scale(1.03);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.25);
 }
 
 .live-card:active {
   transform: scale(0.98);
 }
 
-
-/* =========================================================
+/* =========================
    LIVE IMAGE
-========================================================= */
+========================= */
 
 .live-image-wrapper {
   position: relative;
-
   width: 100%;
-
   aspect-ratio: 16 / 9;
-
-  background: #111;
-
+  background: #222;
   overflow: hidden;
 }
 
 .live-image-wrapper img {
   width: 100%;
   height: 100%;
-
-  display: block;
-
   object-fit: cover;
+  display: block;
 }
 
-
-/* =========================================================
+/* =========================
    LIVE BADGE
-========================================================= */
+========================= */
 
 .live-badge {
   position: absolute;
-
-  top: 8px;
   left: 8px;
-
-  padding: 4px 7px;
-
-  background: rgba(0, 0, 0, 0.75);
-
+  bottom: 8px;
+  background: #e00000;
   color: #fff;
-
+  padding: 4px 8px;
+  border-radius: 5px;
   font-size: 11px;
-
-  font-weight: bold;
+  font-weight: 700;
+  line-height: 1;
 }
 
-
-/* =========================================================
-   LIVE CARD TITLE
-========================================================= */
+/* =========================
+   LIVE TITLE
+========================= */
 
 .live-card h2 {
   margin: 0;
-
   padding: 10px;
-
+  color: #fff;
   font-size: 14px;
-
-  font-weight: 500;
-
+  font-weight: 600;
   white-space: nowrap;
-
   overflow: hidden;
-
   text-overflow: ellipsis;
 }
 
-
-/* =========================================================
-   LIVE GRID MOBILE
-========================================================= */
-
-@media (max-width: 767px) {
-
-  .live-grid {
-    grid-template-columns:
-      repeat(2, minmax(0, 1fr));
-
-    gap: 8px;
-
-    padding: 8px;
-  }
-
-  .live-header {
-    padding: 0 10px;
-  }
-
-  .live-header h1 {
-    font-size: 18px;
-  }
-
-}
-
-
-/* =========================================================
-   LIVE WATCH PAGE
-========================================================= */
+/* =========================
+   LIVE WATCH
+   FULL SCREEN REELS STYLE
+========================= */
 
 .live-watch-page {
   position: fixed;
-
   inset: 0;
-
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   height: 100dvh;
-
   overflow: hidden;
-
   background: #000;
-
   color: #fff;
-
-  z-index: 9999;
-
   touch-action: pan-y;
+  overscroll-behavior: none;
 }
 
-
-/* =========================================================
+/* =========================
    LIVE WATCH HEADER
-========================================================= */
+========================= */
 
 .live-watch-header {
   position: absolute;
-
   top: 0;
   left: 0;
   right: 0;
-
-  height: 70px;
-
+  height: 65px;
   display: flex;
-
   align-items: center;
-
-  padding: 0 15px;
-
+  gap: 15px;
+  padding: 10px 15px;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.8),
+    rgba(0, 0, 0, 0)
+  );
   z-index: 5000;
-
-  background:
-    linear-gradient(
-      to bottom,
-      rgba(0, 0, 0, 0.8),
-      rgba(0, 0, 0, 0)
-    );
-}
-
-.live-watch-header h1 {
-  margin: 0 0 0 12px;
-
-  color: #fff;
-
-  font-size: 18px;
-
-  font-weight: 600;
-
-  white-space: nowrap;
-
-  overflow: hidden;
-
-  text-overflow: ellipsis;
-}
-
-
-/* =========================================================
-   LIVE WATCH BACK BUTTON
-========================================================= */
-
-.live-watch-header .back-btn {
-  width: 40px;
-  height: 40px;
-
-  border: none;
-
-  border-radius: 0;
-
-  background: rgba(0, 0, 0, 0.6);
-
-  color: #fff;
-
-  display: flex;
-
-  align-items: center;
-  justify-content: center;
-
-  padding: 0;
-
-  cursor: pointer;
-
-  font-size: 24px;
-}
-
-
-/* =========================================================
-   LIVE PLAYER
-========================================================= */
-
-.live-player {
-  position: absolute;
-
-  inset: 0;
-
-  width: 100%;
-  height: 100%;
-
-  background: #000;
-
-  display: flex;
-
-  align-items: center;
-  justify-content: center;
-
-  overflow: hidden;
-}
-
-
-/* =========================================================
-   LIVE VIDEO
-========================================================= */
-
-.live-player video {
-  width: 100%;
-  height: 100%;
-
-  display: block;
-
-  object-fit: contain;
-
-  background: #000;
-
-  user-select: none;
-
-  -webkit-user-select: none;
-
-  -webkit-touch-callout: none;
-}
-
-
-/* =========================================================
-   LIVE WATCH CONTROLS
-   SAME AS NORMAL REELS
-========================================================= */
-
-.live-player-controls {
-  position: absolute;
-
-  top: 50%;
-  right: 10px;
-
-  transform: translateY(-50%);
-
-  display: flex;
-
-  flex-direction: column;
-
-  gap: 10px;
-
-  z-index: 10000;
-}
-
-
-/* =========================================================
-   LIVE MUTE + FULLSCREEN BUTTONS
-========================================================= */
-
-.live-mute-btn,
-.live-fullscreen-btn {
-  width: 40px;
-  height: 40px;
-
-  border: none;
-
-  border-radius: 0;
-
-  background: rgba(0, 0, 0, 0.6);
-
-  display: flex;
-
-  align-items: center;
-  justify-content: center;
-
-  cursor: pointer;
-
-  color: #fff;
-
-  font-size: 14px;
-
-  font-weight: bold;
-
-  padding: 0;
-
-  margin: 0;
-
-  -webkit-tap-highlight-color: transparent;
-}
-
-
-/* =========================================================
-   LIVE CONTROL ICONS
-   SAME REELS IMAGES
-========================================================= */
-
-.live-mute-btn img,
-.live-fullscreen-btn img {
-  width: 24px;
-  height: 24px;
-
-  object-fit: contain;
-
-  display: block;
-
   pointer-events: none;
 }
 
-
-/* =========================================================
-   LIVE CONTROL ACTIVE
-========================================================= */
-
-.live-mute-btn:active,
-.live-fullscreen-btn:active {
-  transform: scale(0.92);
+.live-watch-header .back-btn {
+  pointer-events: auto;
+  flex-shrink: 0;
 }
 
-
-/* =========================================================
-   LIVE CONTROL HOVER
-========================================================= */
-
-.live-mute-btn:hover,
-.live-fullscreen-btn:hover {
-  background: rgba(0, 0, 0, 0.75);
+.live-watch-header h1 {
+  margin: 0;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 5px #000;
 }
 
+/* =========================
+   LIVE PLAYER
+========================= */
 
-/* =========================================================
-   LIVE WATCH INFORMATION
-========================================================= */
+.live-player {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Video fills screen */
+.live-player video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  max-width: none;
+  background: #000;
+  object-fit: contain;
+
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* =========================
+   LIVE WATCH INFO
+========================= */
 
 .live-watch-info {
   position: absolute;
-
-  left: 0;
-  right: 0;
-
-  bottom: 0;
-
-  padding: 30px 20px 20px;
-
-  z-index: 4000;
-
-  background:
-    linear-gradient(
-      to top,
-      rgba(0, 0, 0, 0.85),
-      rgba(0, 0, 0, 0)
-    );
+  left: 10px;
+  right: 80px;
+  bottom: 18px;
+  width: auto;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  z-index: 5000;
+  pointer-events: none;
 }
 
 .live-watch-info h2 {
-  margin: 0 0 6px;
-
+  margin: 0 0 5px;
   color: #fff;
-
-  font-size: 20px;
-
+  font-size: 15px;
   font-weight: 600;
+  line-height: 1.3;
+  word-break: break-word;
+  text-shadow: 0 1px 5px #000;
 }
 
 .live-watch-info span {
-  color: #fff;
-
-  font-size: 14px;
-
-  font-weight: 600;
+  color: #ff3333;
+  font-size: 12px;
+  font-weight: 700;
+  text-shadow: 0 1px 5px #000;
 }
 
+/* =========================
+   LIVE FULLSCREEN BUTTON
+========================= */
 
-/* =========================================================
+.live-player-controls {
+  position: absolute;
+  right: 10px;
+  bottom: 65px;
+  z-index: 6000;
+}
+
+.fullscreen-btn {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.fullscreen-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* =========================
    LIVE POSITION
-========================================================= */
+========================= */
 
 .live-position {
   position: absolute;
-
-  left: 50%;
-  bottom: 20px;
-
-  transform: translateX(-50%);
-
+  top: 15px;
+  right: 15px;
   z-index: 6000;
-
-  padding: 5px 10px;
-
-  background: rgba(0, 0, 0, 0.55);
-
-  color: #fff;
-
-  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(0, 0, 0, 0.45);
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  pointer-events: none;
 }
 
-
-/* =========================================================
-   LIVE WATCH MOBILE
-========================================================= */
+/* =========================
+   MOBILE
+========================= */
 
 @media (max-width: 767px) {
 
-  /* -----------------------------------------
-     REELS MOBILE
-  ----------------------------------------- */
+  /* =========================
+     REELS
+  ========================= */
+
+  .brand-logo {
+    top: 12px;
+    left: 12px;
+  }
+
+  .brand-logo img {
+    width: 85px;
+  }
 
   .top-controls {
     right: 7px;
-
     gap: 8px;
   }
 
@@ -915,133 +752,169 @@ body {
     height: 38px;
   }
 
-  .control-btn img {
-    width: 24px;
-    height: 24px;
+  .reel-counter {
+    right: 110px;
   }
 
+  /* =========================
+     LOGIN
+  ========================= */
 
-  /* -----------------------------------------
-     LIVE PAGE MOBILE
-  ----------------------------------------- */
-
-  .live-grid {
-    grid-template-columns:
-      repeat(2, minmax(0, 1fr));
-
-    gap: 8px;
-
-    padding: 8px;
+  .login-card {
+    width: 100%;
+    max-width: 360px;
   }
+
+  .pin-inputs input {
+    width: 58px;
+    height: 58px;
+  }
+
+  /* =========================
+     LIVE PAGE
+  ========================= */
 
   .live-header {
-    padding: 0 10px;
+    height: 60px;
+    padding: 8px 10px;
+    gap: 10px;
+  }
+
+  .live-header img {
+    width: 42px;
+    height: 42px;
   }
 
   .live-header h1 {
-    font-size: 18px;
+    font-size: 20px;
   }
 
+  .live-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    padding: 10px;
+  }
 
-  /* -----------------------------------------
-     LIVE WATCH MOBILE
-  ----------------------------------------- */
+  .live-card {
+    border-radius: 9px;
+  }
+
+  .live-card h2 {
+    font-size: 13px;
+    padding: 8px;
+  }
+
+  .live-badge {
+    left: 6px;
+    bottom: 6px;
+    padding: 4px 6px;
+    font-size: 10px;
+  }
+
+  /* =========================
+     LIVE WATCH
+  ========================= */
+
+  .live-watch-page {
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: hidden;
+  }
 
   .live-watch-header {
     height: 60px;
-
-    padding: 0 10px;
+    padding: 8px 10px;
+    gap: 10px;
   }
 
   .live-watch-header h1 {
     font-size: 16px;
   }
 
-  .live-watch-header .back-btn {
-    width: 38px;
-    height: 38px;
-
-    font-size: 22px;
+  .live-player {
+    position: absolute;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
   }
 
-
-  /* SAME AS REELS */
-
-  .live-player-controls {
-    right: 7px;
-
-    gap: 8px;
+  .live-player video {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    aspect-ratio: auto;
+    object-fit: contain;
   }
-
-  .live-mute-btn,
-  .live-fullscreen-btn {
-    width: 38px;
-    height: 38px;
-  }
-
-  .live-mute-btn img,
-  .live-fullscreen-btn img {
-    width: 24px;
-    height: 24px;
-  }
-
 
   .live-watch-info {
-    padding: 25px 15px 15px;
+    left: 8px;
+    right: 60px;
+    bottom: 18px;
   }
 
   .live-watch-info h2 {
-    font-size: 18px;
+    font-size: 14px;
   }
 
   .live-watch-info span {
-    font-size: 13px;
+    font-size: 11px;
   }
 
+  .live-player-controls {
+    right: 8px;
+    bottom: 65px;
+  }
+
+  .fullscreen-btn {
+    width: 38px;
+    height: 38px;
+    font-size: 20px;
+  }
+
+  .live-position {
+    top: 12px;
+    right: 10px;
+  }
 }
 
+/* =========================
+   DESKTOP
+========================= */
 
-/* =========================================================
-   VIDEO FULLSCREEN
-========================================================= */
+@media (min-width: 768px) {
+  .control-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
 
-.live-player video:fullscreen {
-  width: 100vw;
-  height: 100vh;
+  .live-watch-page {
+    width: 100vw;
+    height: 100vh;
+  }
 
+  .live-player {
+    width: 100vw;
+    height: 100vh;
+  }
+}
+
+/* =========================
+   FULLSCREEN VIDEO
+========================= */
+
+video:fullscreen {
+  width: 100%;
+  height: 100%;
   object-fit: contain;
-
   background: #000;
 }
 
-.live-player video:-webkit-full-screen {
-  width: 100vw;
-  height: 100vh;
-
+video:-webkit-full-screen {
+  width: 100%;
+  height: 100%;
   object-fit: contain;
-
   background: #000;
 }
-
-
-/* =========================================================
-   PREVENT IMAGE / VIDEO DRAG
-========================================================= */
-
-img,
-video {
-  -webkit-user-drag: none;
-
-  user-select: none;
-}
-
-
-/* =========================================================
-   SCROLLBAR
-========================================================= */
-
-::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-}
-
+```
