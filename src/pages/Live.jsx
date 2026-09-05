@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { APP } from '../config'
@@ -46,9 +47,11 @@ export default function Live() {
       })
   }, [])
 
-  const openLive = (model) => {
+  const openLive = (model, index) => {
     navigate('/live-watch', {
       state: {
+        models,
+        index,
         title: model.title,
         image: model.image,
         video: model.video,
@@ -85,7 +88,7 @@ export default function Live() {
           <article
             className="live-card"
             key={model.title || index}
-            onClick={() => openLive(model)}
+            onClick={() => openLive(model, index)}
           >
             <div className="live-image-wrapper">
               <img
@@ -111,3 +114,4 @@ export default function Live() {
     </main>
   )
 }
+
