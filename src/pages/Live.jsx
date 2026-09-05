@@ -23,11 +23,21 @@ export default function Live() {
         return r.json()
       })
       .then((data) => {
-        if (!Array.isArray(data)) {
-          throw new Error('Invalid live data')
+        console.log('Live API response:', data)
+
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data.models)
+            ? data.models
+            : Array.isArray(data.data)
+              ? data.data
+              : []
+
+        if (!list.length) {
+          throw new Error('No live models found')
         }
 
-        setModels(data)
+        setModels(list)
         setStatus('')
       })
       .catch((e) => {
@@ -92,7 +102,9 @@ export default function Live() {
               </span>
             </div>
 
-            <h2>{model.title || 'Live model'}</h2>
+            <h2>
+              {model.title || 'Live model'}
+            </h2>
           </article>
         ))}
       </section>
