@@ -12,7 +12,8 @@
     "react": "latest",
     "react-dom": "latest",
     "lucide-react": "latest",
-    "react-router-dom": "latest"
+    "react-router-dom": "latest",
+    "hls.js": "latest"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "latest",
