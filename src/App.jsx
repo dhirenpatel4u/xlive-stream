@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login'
 import Reels from './pages/Reels'
 import Live from './pages/Live'
+import LiveWatch from './pages/LiveWatch'
 
 function Protected({ children, loggedIn }) {
   if (!loggedIn) {
@@ -48,6 +49,8 @@ export default function App() {
           </Protected>
         }
       />
+
+      <Route path="/live-watch" element={<LiveWatch />} />
 
       <Route
         path="*"
