@@ -1,3 +1,4 @@
+```jsx
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import ControlButton from '../components/ControlButton'
@@ -11,6 +12,7 @@ function shuffle(arr) {
 
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
+
     ;[a[i], a[j]] = [a[j], a[i]]
   }
 
@@ -29,8 +31,6 @@ export default function Reels() {
   const [fit, setFit] = useState('fit')
   const [speed, setSpeed] = useState(1)
 
-  // IMPORTANT:
-  // Data loading and video loading are separate.
   const [dataLoading, setDataLoading] = useState(true)
   const [videoLoading, setVideoLoading] = useState(false)
 
@@ -39,9 +39,18 @@ export default function Reels() {
   const [flash, setFlash] = useState('')
 
   const videoRefs = useRef([])
+
   const touchStart = useRef(null)
   const wheelLock = useRef(false)
+
   const holdTimer = useRef(null)
+
+  // Tracks whether video was playing before long press.
+  const wasPlayingBeforeHold = useRef(false)
+
+  // Tracks whether long press actually activated.
+  const longPressActive = useRef(false)
+
   const lastTap = useRef(0)
 
   // --------------------------------------------------
@@ -72,6 +81,7 @@ export default function Reels() {
         setVideos(list)
         setOrder(shuffle(list.map((_, i) => i)))
         setIndex(0)
+
         setDataLoading(false)
       })
       .catch((e) => {
@@ -97,10 +107,15 @@ export default function Reels() {
   const getIndex = useCallback(
     (i) => {
       if (!order.length) return -1
+
       return order[(i + order.length) % order.length]
     },
     [order]
   )
+
+  // --------------------------------------------------
+  // CHANGE REEL
+  // --------------------------------------------------
 
   const go = useCallback(
     (delta) => {
@@ -108,13 +123,14 @@ export default function Reels() {
 
       setVideoLoading(true)
       setProgress(0)
+
       setIndex((i) => i + delta)
     },
     [order.length]
   )
 
   // --------------------------------------------------
-  // OPEN SPECIFIC REEL FROM URL
+  // URL REEL
   // --------------------------------------------------
 
   useEffect(() => {
@@ -139,6 +155,7 @@ export default function Reels() {
     if (found >= 0) {
       setOrder((prev) => {
         const rest = prev.filter((x) => x !== found)
+
         return [found, ...rest]
       })
 
@@ -147,7 +164,11 @@ export default function Reels() {
   }, [videos, location.search])
 
   // --------------------------------------------------
-  // PLAY CURRENT VIDEO
+  // CURRENT VIDEO SETUP
+  //
+  // IMPORTANT:
+  // This effect only runs when the REEL changes.
+  // Changing speed does NOT reload the video.
   // --------------------------------------------------
 
   useEffect(() => {
@@ -166,18 +187,48 @@ export default function Reels() {
 
     if (active) {
       active.muted = muted
+
+      // Apply selected speed to the new video.
       active.playbackRate = speed
 
       setVideoLoading(true)
 
-      active
-        .play()
-        .catch(() => {
-          // Browser may block autoplay.
-          // User can press play manually.
-        })
+      active.play().catch(() => {})
     }
-  }, [index, muted, speed, videos, order])
+  }, [index, videos, order])
+
+  // --------------------------------------------------
+  // MUTE CHANGE
+  //
+  // Does NOT reload or restart video.
+  // --------------------------------------------------
+
+  useEffect(() => {
+    const active = videoRefs.current[index]
+
+    if (!active) return
+
+    active.muted = muted
+  }, [muted, index])
+
+  // --------------------------------------------------
+  // SPEED CHANGE
+  //
+  // ONLY changes playbackRate.
+  // NEVER shows loading spinner.
+  // NEVER restarts video.
+  // --------------------------------------------------
+
+  useEffect(() => {
+    const active = videoRefs.current[index]
+
+    if (!active) return
+
+    // Don't overwrite temporary 2x long-press speed.
+    if (longPressActive.current) return
+
+    active.playbackRate = speed
+  }, [speed, index])
 
   // --------------------------------------------------
   // KEYBOARD
@@ -187,11 +238,13 @@ export default function Reels() {
     const key = (e) => {
       if (e.key === 'ArrowDown' || e.key === 'PageDown') {
         e.preventDefault()
+
         go(1)
       }
 
       if (e.key === 'ArrowUp' || e.key === 'PageUp') {
         e.preventDefault()
+
         go(-1)
       }
 
@@ -219,12 +272,13 @@ export default function Reels() {
   }, [go])
 
   // --------------------------------------------------
-  // MOUSE WHEEL
+  // WHEEL
   // --------------------------------------------------
 
   useEffect(() => {
     const onWheel = (e) => {
       if (wheelLock.current) return
+
       if (Math.abs(e.deltaY) < 25) return
 
       wheelLock.current = true
@@ -261,7 +315,7 @@ export default function Reels() {
   }
 
   // --------------------------------------------------
-  // FLASH MESSAGE
+  // FLASH
   // --------------------------------------------------
 
   const showFlash = (text) => {
@@ -269,7 +323,7 @@ export default function Reels() {
 
     setTimeout(() => {
       setFlash('')
-    }, 450)
+    }, 700)
   }
 
   // --------------------------------------------------
@@ -289,7 +343,7 @@ export default function Reels() {
   }
 
   // --------------------------------------------------
-  // VIDEO OPTIONS
+  // FIT
   // --------------------------------------------------
 
   const toggleFit = () => {
@@ -297,6 +351,10 @@ export default function Reels() {
       (f) => FITS[(FITS.indexOf(f) + 1) % FITS.length]
     )
   }
+
+  // --------------------------------------------------
+  // SPEED
+  // --------------------------------------------------
 
   const toggleSpeed = () => {
     setSpeed(
@@ -323,6 +381,7 @@ export default function Reels() {
         })
       } else {
         await navigator.clipboard.writeText(url)
+
         showFlash('Link copied')
       }
     } catch {}
@@ -378,15 +437,24 @@ export default function Reels() {
   }
 
   // --------------------------------------------------
-  // VIDEO CLICK / DOUBLE CLICK
+  // VIDEO CLICK
   // --------------------------------------------------
 
   const clickVideo = (e) => {
+    // If this was a long press, don't execute
+    // normal click/play-pause behavior.
+    if (longPressActive.current) {
+      longPressActive.current = false
+      return
+    }
+
     const now = Date.now()
+
     const v = videoRefs.current[index]
 
     if (now - lastTap.current < 280) {
       const r = e.currentTarget.getBoundingClientRect()
+
       const x = e.clientX - r.left
 
       if (v) {
@@ -420,32 +488,83 @@ export default function Reels() {
   }
 
   // --------------------------------------------------
-  // LONG PRESS
+  // LONG PRESS START
+  //
+  // Hold = temporary 2x.
+  // Does NOT change selected speed.
   // --------------------------------------------------
 
   const holdStart = () => {
-    holdTimer.current = setTimeout(() => {
-      const v = videoRefs.current[index]
+    const v = videoRefs.current[index]
 
-      if (v) {
-        v.playbackRate = 2
-        showFlash('2×')
+    if (!v) return
+
+    // Remember current playback state.
+    wasPlayingBeforeHold.current = !v.paused
+
+    clearTimeout(holdTimer.current)
+
+    holdTimer.current = setTimeout(() => {
+      const active = videoRefs.current[index]
+
+      if (!active) return
+
+      longPressActive.current = true
+
+      // Temporary 2x.
+      active.playbackRate = 2
+
+      // Keep playing if it was playing.
+      if (wasPlayingBeforeHold.current) {
+        active.play().catch(() => {})
       }
+
+      // Show 2x only when long press actually starts.
+      showFlash('2×')
     }, 450)
   }
+
+  // --------------------------------------------------
+  // LONG PRESS END
+  //
+  // Restore normal selected speed.
+  // If video was playing before hold, keep playing.
+  // If it was paused before hold, keep it paused.
+  // --------------------------------------------------
 
   const holdEnd = () => {
     clearTimeout(holdTimer.current)
 
     const v = videoRefs.current[index]
 
-    if (v) {
+    if (!v) return
+
+    if (longPressActive.current) {
+      longPressActive.current = false
+
+      // Restore selected speed.
       v.playbackRate = speed
+
+      // IMPORTANT:
+      // Do NOT pause after releasing long press.
+      if (wasPlayingBeforeHold.current) {
+        v.play().catch(() => {})
+      }
     }
   }
 
   // --------------------------------------------------
-  // INITIAL DATA LOADING ONLY
+  // CLEAN UP HOLD TIMER
+  // --------------------------------------------------
+
+  useEffect(() => {
+    return () => {
+      clearTimeout(holdTimer.current)
+    }
+  }, [])
+
+  // --------------------------------------------------
+  // DATA LOADING ONLY
   // --------------------------------------------------
 
   if (dataLoading) {
@@ -461,7 +580,9 @@ export default function Reels() {
       <div className="error-screen">
         <p>{error}</p>
 
-        <button onClick={() => window.location.reload()}>
+        <button
+          onClick={() => window.location.reload()}
+        >
           Retry
         </button>
       </div>
@@ -476,10 +597,6 @@ export default function Reels() {
     )
   }
 
-  // --------------------------------------------------
-  // THREE REEL POSITIONS
-  // --------------------------------------------------
-
   const wrappers = [-1, 0, 1].map((offset) => ({
     offset,
     i: index + offset,
@@ -493,13 +610,19 @@ export default function Reels() {
       onTouchEnd={endTouch}
     >
 
+      {/* LIVE */}
       <div className="live-button">
         <button onClick={() => navigate('/live')}>
-          <img src="/assets/live.png" alt="" />
+          <img
+            src="/assets/live.png"
+            alt=""
+          />
+
           <span>LIVE</span>
         </button>
       </div>
 
+      {/* LOGO */}
       <div
         className="brand-logo"
         onClick={() => {
@@ -513,6 +636,7 @@ export default function Reels() {
         />
       </div>
 
+      {/* VIDEOS */}
       <div className="video-container">
 
         {wrappers.map(({ offset, i, data }) =>
@@ -549,11 +673,9 @@ export default function Reels() {
                         : 'cover'
                 }}
 
-                /*
-                 * IMPORTANT:
-                 * Do NOT call setDataLoading(true) here.
-                 * That was causing the infinite spinner.
-                 */
+                // -------------------------------
+                // VIDEO EVENTS
+                // -------------------------------
 
                 onLoadStart={() => {
                   if (i === index) {
@@ -567,22 +689,28 @@ export default function Reels() {
                   }
                 }}
 
-                onWaiting={() => {
-                  if (i === index) {
-                    setVideoLoading(true)
-                  }
-                }}
-
                 onPlaying={() => {
                   if (i === index) {
                     setVideoLoading(false)
                   }
                 }}
 
+                onWaiting={() => {
+                  // IMPORTANT:
+                  // Waiting can happen during buffering,
+                  // but changing playback speed itself
+                  // must NOT manually trigger loading.
+                  if (i === index) {
+                    setVideoLoading(true)
+                  }
+                }}
+
                 onError={() => {
                   if (i === index) {
                     setVideoLoading(false)
-                    setError('Video could not be loaded.')
+                    setError(
+                      'Video could not be loaded.'
+                    )
                   }
                 }}
 
@@ -607,15 +735,25 @@ export default function Reels() {
 
                 onClick={clickVideo}
 
+                // -------------------------------
+                // LONG PRESS
+                // -------------------------------
+
                 onPointerDown={holdStart}
+
                 onPointerUp={holdEnd}
+
                 onPointerCancel={holdEnd}
+
                 onPointerLeave={holdEnd}
               />
 
               <div className="video-info">
                 <div className="video-title">
-                  {data.isLive ? '🔴 Live - ' : ''}
+                  {data.isLive
+                    ? '🔴 Live - '
+                    : ''}
+
                   {data.title}
                 </div>
               </div>
@@ -626,13 +764,14 @@ export default function Reels() {
 
       </div>
 
-      {/* VIDEO LOADING SPINNER */}
+      {/* VIDEO BUFFER SPINNER */}
       {videoLoading && (
         <div className="spinner">
           <div className="loader" />
         </div>
       )}
 
+      {/* ERROR */}
       {error && (
         <div className="error-msg">
           <div>{error}</div>
@@ -642,10 +781,12 @@ export default function Reels() {
               setError('')
               setVideoLoading(true)
 
-              const v = videoRefs.current[index]
+              const v =
+                videoRefs.current[index]
 
               if (v) {
                 v.load()
+
                 v.play().catch(() => {})
               }
             }}
@@ -655,6 +796,7 @@ export default function Reels() {
         </div>
       )}
 
+      {/* CONTROLS */}
       <div className="top-controls">
 
         <ControlButton
@@ -663,8 +805,14 @@ export default function Reels() {
               ? '/assets/mute.png'
               : '/assets/unmute.png'
           }
-          onClick={() => setMuted((m) => !m)}
-          title={muted ? 'Unmute' : 'Mute'}
+          onClick={() =>
+            setMuted((m) => !m)
+          }
+          title={
+            muted
+              ? 'Unmute'
+              : 'Mute'
+          }
         />
 
         <ControlButton
@@ -682,7 +830,7 @@ export default function Reels() {
         <ControlButton
           label={`${speed}x`}
           onClick={toggleSpeed}
-          title="Change playback speed"
+          title="Change video speed"
         />
 
         <ControlButton
@@ -721,6 +869,7 @@ export default function Reels() {
 
       </div>
 
+      {/* PROGRESS */}
       <div
         className="global-progress-container"
         onClick={seek}
@@ -733,12 +882,14 @@ export default function Reels() {
         />
       </div>
 
+      {/* FLASH */}
       {flash && (
         <div className="seek-flash">
           {flash}
         </div>
       )}
 
+      {/* COUNTER */}
       <div className="reel-counter">
         {index + 1} / {order.length}
       </div>
@@ -746,3 +897,4 @@ export default function Reels() {
     </main>
   )
 }
+```
