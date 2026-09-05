@@ -4,6 +4,7 @@ import { APP } from '../config'
 
 export default function Live() {
   const navigate = useNavigate()
+
   const [models, setModels] = useState([])
   const [status, setStatus] = useState('Loading live data…')
 
@@ -16,40 +17,17 @@ export default function Live() {
     fetch(APP.liveApiUrl)
       .then(async (r) => {
         if (!r.ok) {
-          let message = `HTTP ${r.status}`
-
-          try {
-            const errorData = await r.json()
-            if (errorData?.error) {
-              message = errorData.error
-            }
-          } catch {}
-
-          throw new Error(message)
+          throw new Error(`HTTP ${r.status}`)
         }
 
         return r.json()
       })
       .then((data) => {
-        console.log('Live API response:', data)
-
-        let list = []
-
-        if (Array.isArray(data)) {
-          list = data
-        } else if (Array.isArray(data.models)) {
-          list = data.models
-        } else if (Array.isArray(data.data)) {
-          list = data.data
-        } else if (Array.isArray(data.data?.models)) {
-          list = data.data.models
+        if (!Array.isArray(data)) {
+          throw new Error('Invalid live data')
         }
 
-        const publicModels = list.filter(
-          (x) => (x.status || 'public').toLowerCase() === 'public'
-        )
-
-        setModels(publicModels)
+        setModels(data)
         setStatus('')
       })
       .catch((e) => {
@@ -57,6 +35,16 @@ export default function Live() {
         setStatus(`Unable to load live data: ${e.message}`)
       })
   }, [])
+
+  const openLive = (model) => {
+    navigate('/live-watch', {
+      state: {
+        title: model.title,
+        image: model.image,
+        video: model.video,
+      },
+    })
+  }
 
   return (
     <main className="live-page">
@@ -83,21 +71,28 @@ export default function Live() {
       )}
 
       <section className="live-grid">
-        {models.map((m, i) => (
+        {models.map((model, index) => (
           <article
             className="live-card"
-            key={m.id || m.username || i}
+            key={model.title || index}
+            onClick={() => openLive(model)}
           >
-            <img
-              src={m.image || m.avatar || m.thumbnail}
-              alt={m.name || m.username || 'Live model'}
-            />
+            <div className="live-image-wrapper">
+              <img
+                src={model.image}
+                alt={model.title || 'Live'}
+                loading="lazy"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                }}
+              />
 
-            <h2>
-              {m.name || m.username || 'Live model'}
-            </h2>
+              <span className="live-badge">
+                🔴 LIVE
+              </span>
+            </div>
 
-            <span>🔴 LIVE</span>
+            <h2>{model.title || 'Live model'}</h2>
           </article>
         ))}
       </section>
