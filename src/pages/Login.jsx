@@ -1,4 +1,3 @@
-```jsx
 import { useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { APP } from '../config'
@@ -121,4 +120,3 @@ export default function Login({ onLogin }) {
     </main>
   )
 }
-```
