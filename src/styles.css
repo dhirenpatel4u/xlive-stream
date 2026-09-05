@@ -1,4 +1,4 @@
-
+```css
 /* =========================================================
    GLOBAL
 ========================================================= */
@@ -732,7 +732,7 @@ body {
 
 /* =========================================================
    LIVE WATCH CONTROLS
-   EXACT REELS STYLE
+   SAME AS NORMAL REELS
 ========================================================= */
 
 .live-player-controls {
@@ -773,13 +773,17 @@ body {
   align-items: center;
   justify-content: center;
 
-  padding: 0;
-
-  margin: 0;
-
   cursor: pointer;
 
   color: #fff;
+
+  font-size: 14px;
+
+  font-weight: bold;
+
+  padding: 0;
+
+  margin: 0;
 
   -webkit-tap-highlight-color: transparent;
 }
@@ -787,7 +791,7 @@ body {
 
 /* =========================================================
    LIVE CONTROL ICONS
-   USING SAME REELS IMAGES
+   SAME REELS IMAGES
 ========================================================= */
 
 .live-mute-btn img,
@@ -804,7 +808,7 @@ body {
 
 
 /* =========================================================
-   LIVE CONTROL PRESS
+   LIVE CONTROL ACTIVE
 ========================================================= */
 
 .live-mute-btn:active,
@@ -896,6 +900,53 @@ body {
 
 @media (max-width: 767px) {
 
+  /* -----------------------------------------
+     REELS MOBILE
+  ----------------------------------------- */
+
+  .top-controls {
+    right: 7px;
+
+    gap: 8px;
+  }
+
+  .control-btn {
+    width: 38px;
+    height: 38px;
+  }
+
+  .control-btn img {
+    width: 24px;
+    height: 24px;
+  }
+
+
+  /* -----------------------------------------
+     LIVE PAGE MOBILE
+  ----------------------------------------- */
+
+  .live-grid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+
+    gap: 8px;
+
+    padding: 8px;
+  }
+
+  .live-header {
+    padding: 0 10px;
+  }
+
+  .live-header h1 {
+    font-size: 18px;
+  }
+
+
+  /* -----------------------------------------
+     LIVE WATCH MOBILE
+  ----------------------------------------- */
+
   .live-watch-header {
     height: 60px;
 
@@ -914,7 +965,7 @@ body {
   }
 
 
-  /* SAME SIZE AS MOBILE REELS */
+  /* SAME AS REELS */
 
   .live-player-controls {
     right: 7px;
@@ -993,4 +1044,4 @@ video {
   width: 0;
   height: 0;
 }
-
+```
