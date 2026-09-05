@@ -1,4 +1,3 @@
-```jsx
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import ControlButton from '../components/ControlButton'
@@ -897,4 +896,3 @@ export default function Reels() {
     </main>
   )
 }
-```
