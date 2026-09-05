@@ -1,4 +1,3 @@
-```jsx
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Hls from 'hls.js'
@@ -464,4 +463,3 @@ export default function LiveWatch() {
     </main>
   )
 }
-```
