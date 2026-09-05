@@ -37,23 +37,23 @@ export default function Reels() {
   const [progress, setProgress] = useState(0)
   const [flash, setFlash] = useState('')
 
-  // Shows 2x continuously while long press is active.
+  // Shows 2x while finger is held.
   const [holdSpeedActive, setHoldSpeedActive] = useState(false)
 
   const videoRefs = useRef([])
+
+  // Hidden preload video elements.
+  const preloadRefs = useRef({})
 
   const touchStart = useRef(null)
   const wheelLock = useRef(false)
 
   const holdTimer = useRef(null)
 
-  // Was the video playing before long press?
   const wasPlayingBeforeHold = useRef(false)
-
-  // Long press has actually activated.
   const longPressActive = useRef(false)
 
-  // Prevents spinner caused by temporary playback-rate changes.
+  // Prevent speed changes from causing spinner.
   const changingSpeed = useRef(false)
 
   // --------------------------------------------------
@@ -124,10 +124,10 @@ export default function Reels() {
     (delta) => {
       if (!order.length) return
 
-      setHoldSpeedActive(false)
-      longPressActive.current = false
-
       clearTimeout(holdTimer.current)
+
+      longPressActive.current = false
+      setHoldSpeedActive(false)
 
       setVideoLoading(true)
       setProgress(0)
@@ -174,7 +174,8 @@ export default function Reels() {
   // --------------------------------------------------
   // CURRENT VIDEO SETUP
   //
-  // Only runs when reel changes.
+  // Current video loads normally.
+  // Previous visible videos are stopped.
   // --------------------------------------------------
 
   useEffect(() => {
@@ -202,6 +203,182 @@ export default function Reels() {
   }, [index, videos, order])
 
   // --------------------------------------------------
+  // PRELOAD NEXT 3 VIDEOS
+  //
+  // Current:
+  //   Full normal loading.
+  //
+  // Next 3:
+  //   Preload approximately 5 seconds.
+  //
+  // Previous:
+  //   Stop and remove source.
+  // --------------------------------------------------
+
+  useEffect(() => {
+    if (!videos.length || !order.length) return
+
+    const nextIndexes = []
+
+    // Get next 3 videos.
+    for (let n = 1; n <= 3; n++) {
+      const position =
+        (index + n) % order.length
+
+      const videoIndex = order[position]
+
+      if (videoIndex !== undefined) {
+        nextIndexes.push(videoIndex)
+      }
+    }
+
+    // -----------------------------------------------
+    // REMOVE VIDEOS THAT ARE NO LONGER NEXT 3
+    // -----------------------------------------------
+
+    Object.keys(preloadRefs.current).forEach((key) => {
+      const videoIndex = Number(key)
+
+      if (!nextIndexes.includes(videoIndex)) {
+        const v = preloadRefs.current[videoIndex]
+
+        if (v) {
+          try {
+            v.pause()
+            v.removeAttribute('src')
+            v.load()
+          } catch {}
+        }
+
+        delete preloadRefs.current[videoIndex]
+      }
+    })
+
+    // -----------------------------------------------
+    // CREATE PRELOADERS
+    // -----------------------------------------------
+
+    nextIndexes.forEach((videoIndex) => {
+      const data = videos[videoIndex]
+
+      if (!data?.video) return
+
+      // Already being preloaded.
+      if (preloadRefs.current[videoIndex]) {
+        return
+      }
+
+      const preloadVideo =
+        document.createElement('video')
+
+      preloadVideo.preload = 'auto'
+      preloadVideo.muted = true
+      preloadVideo.playsInline = true
+
+      // Important for mobile.
+      preloadVideo.setAttribute(
+        'playsinline',
+        ''
+      )
+
+      preloadVideo.setAttribute(
+        'webkit-playsinline',
+        'true'
+      )
+
+      preloadVideo.src = data.video
+
+      preloadRefs.current[videoIndex] =
+        preloadVideo
+
+      let stopped = false
+
+      const stopAfterFiveSeconds = () => {
+        if (stopped) return
+
+        try {
+          if (!preloadVideo.buffered.length) {
+            return
+          }
+
+          const bufferedEnd =
+            preloadVideo.buffered.end(
+              preloadVideo.buffered.length - 1
+            )
+
+          // Stop after approximately 5 seconds.
+          if (bufferedEnd >= 5) {
+            stopped = true
+
+            preloadVideo.pause()
+
+            preloadVideo.removeEventListener(
+              'progress',
+              stopAfterFiveSeconds
+            )
+
+            preloadVideo.removeEventListener(
+              'canprogress',
+              stopAfterFiveSeconds
+            )
+          }
+        } catch {}
+      }
+
+      preloadVideo.addEventListener(
+        'progress',
+        stopAfterFiveSeconds
+      )
+
+      preloadVideo.addEventListener(
+        'canprogress',
+        stopAfterFiveSeconds
+      )
+
+      // Start loading.
+      preloadVideo.load()
+
+      // Some browsers don't fire enough progress
+      // events, so check buffered data periodically.
+      const checkTimer = setInterval(() => {
+        if (stopped) {
+          clearInterval(checkTimer)
+          return
+        }
+
+        stopAfterFiveSeconds()
+      }, 250)
+
+      // Safety timeout.
+      setTimeout(() => {
+        clearInterval(checkTimer)
+      }, 15000)
+    })
+
+    // -----------------------------------------------
+    // CLEANUP
+    // -----------------------------------------------
+
+    return () => {
+      Object.keys(preloadRefs.current).forEach(
+        (key) => {
+          const v = preloadRefs.current[key]
+
+          if (v) {
+            try {
+              v.pause()
+              v.removeAttribute('src')
+              v.load()
+            } catch {}
+          }
+        }
+      )
+
+      preloadRefs.current = {}
+    }
+  }, [index, videos, order])
+
+  // --------------------------------------------------
   // MUTE
   // --------------------------------------------------
 
@@ -214,11 +391,10 @@ export default function Reels() {
   }, [muted, index])
 
   // --------------------------------------------------
-  // SPEED CHANGE
+  // SPEED
   //
-  // Does NOT reload video.
-  // Does NOT pause video.
-  // Does NOT intentionally show spinner.
+  // Changes playbackRate only.
+  // Does not reload or pause.
   // --------------------------------------------------
 
   useEffect(() => {
@@ -232,7 +408,7 @@ export default function Reels() {
 
     active.playbackRate = speed
 
-    // Don't show spinner just because playback speed changed.
+    // Never show spinner just because speed changed.
     setVideoLoading(false)
 
     const timer = setTimeout(() => {
@@ -250,12 +426,18 @@ export default function Reels() {
 
   useEffect(() => {
     const key = (e) => {
-      if (e.key === 'ArrowDown' || e.key === 'PageDown') {
+      if (
+        e.key === 'ArrowDown' ||
+        e.key === 'PageDown'
+      ) {
         e.preventDefault()
         go(1)
       }
 
-      if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+      if (
+        e.key === 'ArrowUp' ||
+        e.key === 'PageUp'
+      ) {
         e.preventDefault()
         go(-1)
       }
@@ -268,7 +450,10 @@ export default function Reels() {
         toggleFullscreen()
       }
 
-      if (e.key === 'Escape' && document.fullscreenElement) {
+      if (
+        e.key === 'Escape' &&
+        document.fullscreenElement
+      ) {
         document.exitFullscreen()
       }
     }
@@ -276,7 +461,10 @@ export default function Reels() {
     window.addEventListener('keydown', key)
 
     return () => {
-      window.removeEventListener('keydown', key)
+      window.removeEventListener(
+        'keydown',
+        key
+      )
     }
   }, [go])
 
@@ -299,12 +487,19 @@ export default function Reels() {
       }, 450)
     }
 
-    window.addEventListener('wheel', onWheel, {
-      passive: false
-    })
+    window.addEventListener(
+      'wheel',
+      onWheel,
+      {
+        passive: false
+      }
+    )
 
     return () => {
-      window.removeEventListener('wheel', onWheel)
+      window.removeEventListener(
+        'wheel',
+        onWheel
+      )
     }
   }, [go])
 
@@ -317,10 +512,12 @@ export default function Reels() {
 
     if (!v || !v.duration) return
 
-    const r = e.currentTarget.getBoundingClientRect()
+    const r =
+      e.currentTarget.getBoundingClientRect()
 
     v.currentTime =
-      ((e.clientX - r.left) / r.width) * v.duration
+      ((e.clientX - r.left) / r.width) *
+      v.duration
   }
 
   // --------------------------------------------------
@@ -338,7 +535,7 @@ export default function Reels() {
   // --------------------------------------------------
   // FULLSCREEN
   //
-  // Only the video goes fullscreen.
+  // Only video becomes fullscreen.
   // --------------------------------------------------
 
   const toggleFullscreen = async () => {
@@ -347,19 +544,18 @@ export default function Reels() {
     if (!video) return
 
     try {
-      // Already fullscreen
       if (document.fullscreenElement) {
         await document.exitFullscreen()
         return
       }
 
-      // Modern browsers
+      // Chrome / Android / modern browsers.
       if (video.requestFullscreen) {
         await video.requestFullscreen()
         return
       }
 
-      // iPhone / Safari
+      // Safari / iPhone.
       if (video.webkitEnterFullscreen) {
         video.webkitEnterFullscreen()
       }
@@ -372,7 +568,11 @@ export default function Reels() {
 
   const toggleFit = () => {
     setFit(
-      (f) => FITS[(FITS.indexOf(f) + 1) % FITS.length]
+      (f) =>
+        FITS[
+          (FITS.indexOf(f) + 1) %
+            FITS.length
+        ]
     )
   }
 
@@ -382,7 +582,11 @@ export default function Reels() {
 
   const toggleSpeed = () => {
     setSpeed(
-      (s) => SPEEDS[(SPEEDS.indexOf(s) + 1) % SPEEDS.length]
+      (s) =>
+        SPEEDS[
+          (SPEEDS.indexOf(s) + 1) %
+            SPEEDS.length
+        ]
     )
   }
 
@@ -395,16 +599,22 @@ export default function Reels() {
 
     const url =
       `${location.origin}/?reel=` +
-      encodeURIComponent(current.title || '')
+      encodeURIComponent(
+        current.title || ''
+      )
 
     try {
       if (navigator.share) {
         await navigator.share({
-          title: current.title || APP.name,
+          title:
+            current.title ||
+            APP.name,
           url
         })
       } else {
-        await navigator.clipboard.writeText(url)
+        await navigator.clipboard.writeText(
+          url
+        )
 
         showFlash('Link copied')
       }
@@ -418,7 +628,8 @@ export default function Reels() {
   const download = () => {
     if (!current?.download) return
 
-    const a = document.createElement('a')
+    const a =
+      document.createElement('a')
 
     a.href = current.download
     a.download = 'reel.mp4'
@@ -465,10 +676,8 @@ export default function Reels() {
   // --------------------------------------------------
   // VIDEO CLICK
   //
-  // IMPORTANT:
   // Single tap does NOTHING.
   // Double tap does NOTHING.
-  // No pause/play.
   // --------------------------------------------------
 
   const clickVideo = (e) => {
@@ -476,17 +685,19 @@ export default function Reels() {
     e.stopPropagation()
 
     // Intentionally empty.
-    // Video will NOT pause/play on tap.
   }
 
   // --------------------------------------------------
   // LONG PRESS START
   //
-  // Hold = temporary 2x.
+  // Hold for 450ms = temporary 2x.
   // --------------------------------------------------
 
   const holdStart = (e) => {
-    if (e.pointerType === 'mouse' && e.button !== 0) {
+    if (
+      e.pointerType === 'mouse' &&
+      e.button !== 0
+    ) {
       return
     }
 
@@ -496,34 +707,41 @@ export default function Reels() {
 
     clearTimeout(holdTimer.current)
 
-    // Remember whether video was playing.
-    wasPlayingBeforeHold.current = !v.paused
+    // Remember playback state.
+    wasPlayingBeforeHold.current =
+      !v.paused
 
-    holdTimer.current = setTimeout(() => {
-      const active = videoRefs.current[index]
+    holdTimer.current =
+      setTimeout(() => {
+        const active =
+          videoRefs.current[index]
 
-      if (!active) return
+        if (!active) return
 
-      longPressActive.current = true
+        longPressActive.current =
+          true
 
-      // Show 2x continuously while holding.
-      setHoldSpeedActive(true)
+        // Keep 2x indicator visible
+        // until finger is released.
+        setHoldSpeedActive(true)
 
-      // Temporary 2x.
-      active.playbackRate = 2
+        // Temporary 2x.
+        active.playbackRate = 2
 
-      // Make sure it continues playing.
-      if (wasPlayingBeforeHold.current) {
-        active.play().catch(() => {})
-      }
-    }, 450)
+        // Keep playing.
+        if (
+          wasPlayingBeforeHold.current
+        ) {
+          active.play().catch(() => {})
+        }
+      }, 450)
   }
 
   // --------------------------------------------------
   // LONG PRESS END
   //
-  // Release = selected speed.
-  // Video keeps playing.
+  // Restore selected speed.
+  // Never pause the video.
   // --------------------------------------------------
 
   const holdEnd = () => {
@@ -536,26 +754,47 @@ export default function Reels() {
     if (longPressActive.current) {
       longPressActive.current = false
 
-      // Hide 2x indicator.
+      // Hide 2x.
       setHoldSpeedActive(false)
 
-      // Restore user's selected speed.
+      // Restore selected speed.
       v.playbackRate = speed
 
-      // NEVER pause on release.
-      if (wasPlayingBeforeHold.current) {
+      // NEVER pause after release.
+      if (
+        wasPlayingBeforeHold.current
+      ) {
         v.play().catch(() => {})
       }
     }
   }
 
   // --------------------------------------------------
-  // CLEAN UP HOLD TIMER
+  // CLEANUP HOLD
   // --------------------------------------------------
 
   useEffect(() => {
     return () => {
-      clearTimeout(holdTimer.current)
+      clearTimeout(
+        holdTimer.current
+      )
+
+      Object.keys(
+        preloadRefs.current
+      ).forEach((key) => {
+        const v =
+          preloadRefs.current[key]
+
+        if (v) {
+          try {
+            v.pause()
+            v.removeAttribute('src')
+            v.load()
+          } catch {}
+        }
+      })
+
+      preloadRefs.current = {}
     }
   }, [])
 
@@ -577,7 +816,9 @@ export default function Reels() {
         <p>{error}</p>
 
         <button
-          onClick={() => window.location.reload()}
+          onClick={() =>
+            window.location.reload()
+          }
         >
           Retry
         </button>
@@ -593,11 +834,15 @@ export default function Reels() {
     )
   }
 
-  const wrappers = [-1, 0, 1].map((offset) => ({
-    offset,
-    i: index + offset,
-    data: videos[getIndex(index + offset)]
-  }))
+  const wrappers =
+    [-1, 0, 1].map((offset) => ({
+      offset,
+      i: index + offset,
+      data:
+        videos[
+          getIndex(index + offset)
+        ]
+    }))
 
   return (
     <main
@@ -608,7 +853,11 @@ export default function Reels() {
 
       {/* LIVE */}
       <div className="live-button">
-        <button onClick={() => navigate('/live')}>
+        <button
+          onClick={() =>
+            navigate('/live')
+          }
+        >
           <img
             src="/assets/live.png"
             alt=""
@@ -635,149 +884,183 @@ export default function Reels() {
       {/* VIDEOS */}
       <div className="video-container">
 
-        {wrappers.map(({ offset, i, data }) =>
-          data ? (
-            <article
-              key={`${getIndex(i)}-${i}`}
-              className="video-wrapper"
-              style={{
-                transform:
-                  `translateY(${offset * 100}%)`
-              }}
-            >
-
-              <video
-                ref={(el) => {
-                  videoRefs.current[i] = el
-                }}
-                src={data.video}
-                poster={data.image}
-                playsInline
-                webkit-playsinline="true"
-                preload={
-                  Math.abs(offset) === 1
-                    ? 'metadata'
-                    : 'auto'
-                }
-                muted={muted}
-                loop={false}
-                draggable={false}
-                controls={false}
-
-                // Prevent browser long-press menu/download popup.
-                onContextMenu={(e) => {
-                  e.preventDefault()
-                }}
-
-                // Prevent browser drag.
-                onDragStart={(e) => {
-                  e.preventDefault()
-                }}
-
-                // Single tap does NOTHING.
-                onClick={clickVideo}
-
+        {wrappers.map(
+          ({
+            offset,
+            i,
+            data
+          }) =>
+            data ? (
+              <article
+                key={`${getIndex(
+                  i
+                )}-${i}`}
+                className="video-wrapper"
                 style={{
-                  objectFit:
-                    fit === 'fill'
-                      ? 'cover'
-                      : fit === 'fit'
-                        ? 'contain'
-                        : 'cover',
-
-                  // Prevent mobile browser callout/select.
-                  WebkitTouchCallout: 'none',
-                  WebkitUserSelect: 'none',
-                  userSelect: 'none',
-                  WebkitTapHighlightColor: 'transparent'
+                  transform:
+                    `translateY(${offset * 100}%)`
                 }}
+              >
 
-                // -------------------------------
-                // VIDEO EVENTS
-                // -------------------------------
+                <video
+                  ref={(el) => {
+                    videoRefs.current[i] =
+                      el
+                  }}
+                  src={data.video}
+                  poster={data.image}
+                  playsInline
+                  webkit-playsinline="true"
+                  preload="auto"
+                  muted={muted}
+                  loop={false}
+                  draggable={false}
+                  controls={false}
 
-                onLoadStart={() => {
-                  if (i === index) {
-                    setVideoLoading(true)
+                  // Disable mobile long-press
+                  // browser menu/download popup.
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                  }}
+
+                  onDragStart={(e) => {
+                    e.preventDefault()
+                  }}
+
+                  // Single tap does nothing.
+                  onClick={clickVideo}
+
+                  style={{
+                    objectFit:
+                      fit === 'fill'
+                        ? 'cover'
+                        : fit === 'fit'
+                          ? 'contain'
+                          : 'cover',
+
+                    WebkitTouchCallout:
+                      'none',
+
+                    WebkitUserSelect:
+                      'none',
+
+                    userSelect:
+                      'none',
+
+                    WebkitTapHighlightColor:
+                      'transparent'
+                  }}
+
+                  // --------------------------------
+                  // VIDEO EVENTS
+                  // --------------------------------
+
+                  onLoadStart={() => {
+                    if (i === index) {
+                      setVideoLoading(
+                        true
+                      )
+                    }
+                  }}
+
+                  onCanPlay={() => {
+                    if (i === index) {
+                      setVideoLoading(
+                        false
+                      )
+                    }
+                  }}
+
+                  onPlaying={() => {
+                    if (i === index) {
+                      setVideoLoading(
+                        false
+                      )
+
+                      changingSpeed.current =
+                        false
+                    }
+                  }}
+
+                  onWaiting={() => {
+                    if (
+                      i === index &&
+                      !changingSpeed.current &&
+                      !longPressActive.current
+                    ) {
+                      setVideoLoading(
+                        true
+                      )
+                    }
+                  }}
+
+                  onError={() => {
+                    if (i === index) {
+                      setVideoLoading(
+                        false
+                      )
+
+                      setError(
+                        'Video could not be loaded.'
+                      )
+                    }
+                  }}
+
+                  onTimeUpdate={(e) => {
+                    if (i === index) {
+                      setProgress(
+                        e.currentTarget
+                          .duration
+                          ? (
+                              e.currentTarget
+                                .currentTime /
+                              e.currentTarget
+                                .duration
+                            ) * 100
+                          : 0
+                      )
+                    }
+                  }}
+
+                  onEnded={() => {
+                    if (i === index) {
+                      go(1)
+                    }
+                  }}
+
+                  // --------------------------------
+                  // LONG PRESS
+                  // --------------------------------
+
+                  onPointerDown={
+                    holdStart
                   }
-                }}
 
-                onCanPlay={() => {
-                  if (i === index) {
-                    setVideoLoading(false)
+                  onPointerUp={
+                    holdEnd
                   }
-                }}
 
-                onPlaying={() => {
-                  if (i === index) {
-                    setVideoLoading(false)
-                    changingSpeed.current = false
+                  onPointerCancel={
+                    holdEnd
                   }
-                }}
 
-                onWaiting={() => {
-                  // Don't show spinner for a temporary
-                  // speed-rate change.
-                  if (
-                    i === index &&
-                    !changingSpeed.current &&
-                    !longPressActive.current
-                  ) {
-                    setVideoLoading(true)
+                  onPointerLeave={
+                    holdEnd
                   }
-                }}
+                />
 
-                onError={() => {
-                  if (i === index) {
-                    setVideoLoading(false)
+                <div className="video-info">
+                  <div className="video-title">
+                    {data.isLive
+                      ? '🔴 Live - '
+                      : ''}
 
-                    setError(
-                      'Video could not be loaded.'
-                    )
-                  }
-                }}
-
-                onTimeUpdate={(e) => {
-                  if (i === index) {
-                    setProgress(
-                      e.currentTarget.duration
-                        ? (
-                            e.currentTarget.currentTime /
-                            e.currentTarget.duration
-                          ) * 100
-                        : 0
-                    )
-                  }
-                }}
-
-                onEnded={() => {
-                  if (i === index) {
-                    go(1)
-                  }
-                }}
-
-                // -------------------------------
-                // LONG PRESS
-                // -------------------------------
-
-                onPointerDown={holdStart}
-                onPointerUp={holdEnd}
-                onPointerCancel={holdEnd}
-                onPointerLeave={holdEnd}
-              />
-
-              <div className="video-info">
-                <div className="video-title">
-                  {data.isLive
-                    ? '🔴 Live - '
-                    : ''}
-
-                  {data.title}
+                    {data.title}
+                  </div>
                 </div>
-              </div>
 
-            </article>
-          ) : null
+              </article>
+            ) : null
         )}
 
       </div>
@@ -792,24 +1075,33 @@ export default function Reels() {
       {/* ERROR */}
       {error && (
         <div className="error-msg">
+
           <div>{error}</div>
 
           <button
             onClick={() => {
               setError('')
-              setVideoLoading(true)
+              setVideoLoading(
+                true
+              )
 
               const v =
-                videoRefs.current[index]
+                videoRefs.current[
+                  index
+                ]
 
               if (v) {
                 v.load()
-                v.play().catch(() => {})
+
+                v.play().catch(
+                  () => {}
+                )
               }
             }}
           >
             Retry
           </button>
+
         </div>
       )}
 
@@ -852,7 +1144,9 @@ export default function Reels() {
 
         <ControlButton
           icon="/assets/fullscreen-logo.png"
-          onClick={toggleFullscreen}
+          onClick={
+            toggleFullscreen
+          }
           title="Fullscreen"
         />
 
@@ -899,7 +1193,7 @@ export default function Reels() {
         />
       </div>
 
-      {/* LONG PRESS 2X INDICATOR */}
+      {/* LONG PRESS 2X */}
       {holdSpeedActive && (
         <div className="seek-flash">
           2×
@@ -907,11 +1201,12 @@ export default function Reels() {
       )}
 
       {/* NORMAL FLASH */}
-      {flash && !holdSpeedActive && (
-        <div className="seek-flash">
-          {flash}
-        </div>
-      )}
+      {flash &&
+        !holdSpeedActive && (
+          <div className="seek-flash">
+            {flash}
+          </div>
+        )}
 
       {/* COUNTER */}
       <div className="reel-counter">
