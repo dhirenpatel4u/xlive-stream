@@ -43,6 +43,7 @@ export default function Reels() {
   const videoRefs = useRef([])
 
   // Hidden preload video elements.
+  // Only NEXT 2 videos are kept here.
   const preloadRefs = useRef({})
 
   const touchStart = useRef(null)
@@ -175,7 +176,7 @@ export default function Reels() {
   // CURRENT VIDEO SETUP
   //
   // Current video loads normally.
-  // Previous visible videos are stopped.
+  // Other rendered videos do NOT preload.
   // --------------------------------------------------
 
   useEffect(() => {
@@ -203,16 +204,19 @@ export default function Reels() {
   }, [index, videos, order])
 
   // --------------------------------------------------
-  // PRELOAD NEXT 3 VIDEOS
+  // PRELOAD NEXT 2 VIDEOS
   //
   // Current:
   //   Full normal loading.
   //
-  // Next 3:
+  // Next 2:
   //   Preload approximately 5 seconds.
   //
-  // Previous:
-  //   Stop and remove source.
+  // Previous / further videos:
+  //   No preload.
+  //
+  // This is intentionally limited to 2 so that
+  // bandwidth is focused on the next swipe targets.
   // --------------------------------------------------
 
   useEffect(() => {
@@ -220,8 +224,11 @@ export default function Reels() {
 
     const nextIndexes = []
 
-    // Get next 3 videos.
-    for (let n = 1; n <= 3; n++) {
+    // -----------------------------------------------
+    // GET NEXT 2 VIDEOS
+    // -----------------------------------------------
+
+    for (let n = 1; n <= 2; n++) {
       const position =
         (index + n) % order.length
 
@@ -233,7 +240,7 @@ export default function Reels() {
     }
 
     // -----------------------------------------------
-    // REMOVE VIDEOS THAT ARE NO LONGER NEXT 3
+    // REMOVE OLD PRELOAD VIDEOS
     // -----------------------------------------------
 
     Object.keys(preloadRefs.current).forEach((key) => {
@@ -255,7 +262,7 @@ export default function Reels() {
     })
 
     // -----------------------------------------------
-    // CREATE PRELOADERS
+    // CREATE NEXT-2 PRELOADERS
     // -----------------------------------------------
 
     nextIndexes.forEach((videoIndex) => {
@@ -263,7 +270,7 @@ export default function Reels() {
 
       if (!data?.video) return
 
-      // Already being preloaded.
+      // Already preloading.
       if (preloadRefs.current[videoIndex]) {
         return
       }
@@ -275,7 +282,6 @@ export default function Reels() {
       preloadVideo.muted = true
       preloadVideo.playsInline = true
 
-      // Important for mobile.
       preloadVideo.setAttribute(
         'playsinline',
         ''
@@ -286,6 +292,7 @@ export default function Reels() {
         'true'
       )
 
+      // Start loading the next video.
       preloadVideo.src = data.video
 
       preloadRefs.current[videoIndex] =
@@ -306,7 +313,8 @@ export default function Reels() {
               preloadVideo.buffered.length - 1
             )
 
-          // Stop after approximately 5 seconds.
+          // Stop once approximately 5 seconds
+          // are buffered.
           if (bufferedEnd >= 5) {
             stopped = true
 
@@ -335,11 +343,11 @@ export default function Reels() {
         stopAfterFiveSeconds
       )
 
-      // Start loading.
+      // Start network loading.
       preloadVideo.load()
 
-      // Some browsers don't fire enough progress
-      // events, so check buffered data periodically.
+      // Some browsers don't fire progress
+      // frequently enough, so check manually.
       const checkTimer = setInterval(() => {
         if (stopped) {
           clearInterval(checkTimer)
@@ -907,11 +915,37 @@ export default function Reels() {
                     videoRefs.current[i] =
                       el
                   }}
+
                   src={data.video}
-                  poster={data.image}
+
+                  /*
+                   * ONLY CURRENT VIDEO:
+                   * Loads normally.
+                   *
+                   * Previous and next visible
+                   * videos do not independently
+                   * preload their video source.
+                   */
+                  preload={
+                    i === index
+                      ? 'auto'
+                      : 'none'
+                  }
+
+                  /*
+                   * Only current video receives
+                   * the poster. This avoids making
+                   * all rendered videos compete
+                   * with video loading.
+                   */
+                  poster={
+                    i === index
+                      ? data.image
+                      : undefined
+                  }
+
                   playsInline
                   webkit-playsinline="true"
-                  preload="auto"
                   muted={muted}
                   loop={false}
                   draggable={false}
