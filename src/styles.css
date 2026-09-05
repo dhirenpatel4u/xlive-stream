@@ -1,3 +1,4 @@
+
 * {
   box-sizing: border-box;
 }
@@ -59,6 +60,10 @@ button {
   -webkit-user-select: none;
   user-select: none;
 }
+
+/* =========================
+   REEL INFO
+========================= */
 
 .video-info {
   position: absolute;
@@ -138,7 +143,7 @@ button {
 }
 
 /* =========================
-   CONTROLS
+   REEL CONTROLS
 ========================= */
 
 .top-controls {
@@ -550,58 +555,91 @@ button {
 }
 
 /* =========================
-   LIVE WATCH PAGE
+   LIVE WATCH
+   FULL SCREEN REELS STYLE
 ========================= */
 
 .live-watch-page {
   position: fixed;
   inset: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
   background: #000;
   color: #fff;
+  touch-action: pan-y;
+  overscroll-behavior: none;
 }
 
+/* =========================
+   LIVE WATCH HEADER
+========================= */
+
 .live-watch-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 65px;
   display: flex;
   align-items: center;
   gap: 15px;
   padding: 10px 15px;
-  background: #000;
-  position: sticky;
-  top: 0;
-  z-index: 100;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.8),
+    rgba(0, 0, 0, 0)
+  );
+  z-index: 5000;
+  pointer-events: none;
+}
+
+.live-watch-header .back-btn {
+  pointer-events: auto;
+  flex-shrink: 0;
 }
 
 .live-watch-header h1 {
-  font-size: 20px;
   margin: 0;
   color: #fff;
+  font-size: 18px;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-shadow: 0 1px 5px #000;
 }
 
 /* =========================
-   LIVE VIDEO PLAYER
+   LIVE PLAYER
 ========================= */
 
 .live-player {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  max-width: 1100px;
-  margin: 0 auto;
+  height: 100%;
   background: #000;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
+/* Video fills screen */
 .live-player video {
-  width: 100%;
-  height: auto;
-  min-height: 200px;
   display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  max-width: none;
   background: #000;
-  aspect-ratio: 16 / 9;
   object-fit: contain;
+
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 /* =========================
@@ -609,24 +647,80 @@ button {
 ========================= */
 
 .live-watch-info {
-  width: 100%;
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 15px;
+  position: absolute;
+  left: 10px;
+  right: 80px;
+  bottom: 18px;
+  width: auto;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  z-index: 5000;
+  pointer-events: none;
 }
 
 .live-watch-info h2 {
-  margin: 0 0 8px;
+  margin: 0 0 5px;
   color: #fff;
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 600;
+  line-height: 1.3;
   word-break: break-word;
+  text-shadow: 0 1px 5px #000;
 }
 
 .live-watch-info span {
   color: #ff3333;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
+  text-shadow: 0 1px 5px #000;
+}
+
+/* =========================
+   LIVE FULLSCREEN BUTTON
+========================= */
+
+.live-player-controls {
+  position: absolute;
+  right: 10px;
+  bottom: 65px;
+  z-index: 6000;
+}
+
+.fullscreen-btn {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.fullscreen-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* =========================
+   LIVE POSITION
+========================= */
+
+.live-position {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  z-index: 6000;
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(0, 0, 0, 0.45);
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  pointer-events: none;
 }
 
 /* =========================
@@ -634,6 +728,11 @@ button {
 ========================= */
 
 @media (max-width: 767px) {
+
+  /* =========================
+     REELS
+  ========================= */
+
   .brand-logo {
     top: 12px;
     left: 12px;
@@ -657,6 +756,10 @@ button {
     right: 110px;
   }
 
+  /* =========================
+     LOGIN
+  ========================= */
+
   .login-card {
     width: 100%;
     max-width: 360px;
@@ -667,7 +770,9 @@ button {
     height: 58px;
   }
 
-  /* LIVE */
+  /* =========================
+     LIVE PAGE
+  ========================= */
 
   .live-header {
     height: 60px;
@@ -706,29 +811,72 @@ button {
     font-size: 10px;
   }
 
-  /* LIVE WATCH */
+  /* =========================
+     LIVE WATCH
+  ========================= */
+
+  .live-watch-page {
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: hidden;
+  }
 
   .live-watch-header {
-    height: 58px;
+    height: 60px;
     padding: 8px 10px;
     gap: 10px;
   }
 
   .live-watch-header h1 {
-    font-size: 18px;
+    font-size: 16px;
+  }
+
+  .live-player {
+    position: absolute;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
   }
 
   .live-player video {
+    width: 100%;
+    height: 100%;
     min-height: 0;
-    aspect-ratio: 16 / 9;
+    aspect-ratio: auto;
+    object-fit: contain;
   }
 
   .live-watch-info {
-    padding: 12px;
+    left: 8px;
+    right: 60px;
+    bottom: 18px;
   }
 
   .live-watch-info h2 {
-    font-size: 16px;
+    font-size: 14px;
+  }
+
+  .live-watch-info span {
+    font-size: 11px;
+  }
+
+  .live-player-controls {
+    right: 8px;
+    bottom: 65px;
+  }
+
+  .fullscreen-btn {
+    width: 38px;
+    height: 38px;
+    font-size: 20px;
+  }
+
+  .live-position {
+    top: 12px;
+    right: 10px;
   }
 }
 
@@ -740,4 +888,33 @@ button {
   .control-btn:hover {
     background: rgba(255, 255, 255, 0.2);
   }
+
+  .live-watch-page {
+    width: 100vw;
+    height: 100vh;
+  }
+
+  .live-player {
+    width: 100vw;
+    height: 100vh;
+  }
 }
+
+/* =========================
+   FULLSCREEN VIDEO
+========================= */
+
+video:fullscreen {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+video:-webkit-full-screen {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
