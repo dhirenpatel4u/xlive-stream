@@ -54,3 +54,102 @@ button{font:inherit}
 .live-card span{font-size:11px;color:#e00000;font-weight:bold}
 @media(max-width:767px){.brand-logo img{width:85px}.top-controls{right:7px;gap:8px}.control-btn{width:38px;height:38px}.reel-counter{right:110px}.login-card{width:100%;max-width:360px}.pin-inputs input{width:58px;height:58px}}
 @media(min-width:768px){.control-btn:hover{background:rgba(255,255,255,.2)}}
+
+.live-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  padding: 20px;
+}
+
+.live-card {
+  background: #111;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.live-card:hover {
+  transform: scale(1.03);
+}
+
+.live-image-wrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #222;
+  overflow: hidden;
+}
+
+.live-image-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.live-badge {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  background: #e00000;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.live-card h2 {
+  margin: 10px;
+  font-size: 15px;
+  color: white;
+}
+
+.live-watch-page {
+  min-height: 100vh;
+  background: #000;
+  color: white;
+}
+
+.live-watch-header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+}
+
+.live-watch-header h1 {
+  font-size: 20px;
+  margin: 0;
+}
+
+.live-player {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  background: #000;
+}
+
+.live-player video {
+  width: 100%;
+  display: block;
+  background: #000;
+  aspect-ratio: 16 / 9;
+}
+
+.live-watch-info {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 15px;
+}
+
+.live-watch-info h2 {
+  margin: 0 0 8px;
+}
+
+.live-watch-info span {
+  color: #ff3333;
+  font-weight: 700;
+}
