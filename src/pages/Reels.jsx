@@ -1,887 +1,882 @@
-import {
-useCallback,
-useEffect,
-useRef,
-useState
-} from 'react'
-import { useLocation } from 'react-router-dom'
+
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import ControlButton from '../components/ControlButton'
 import { APP } from '../config'
 
 const FITS = ['fit', 'fill', 'auto']
 const SPEEDS = [1, 1.25, 1.5, 2]
 
-function shuffle(array) {
-const result = [...array]
+function shuffle(arr) {
+  const a = [...arr]
 
-for (let i = result.length - 1; i > 0; i--) {
-const j = Math.floor(Math.random() * (i + 1))
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
 
-;[result[i], result[j]] = [
-  result[j],
-  result[i]
-]
-
-}
-
-return result
-}
-
-function getSlug(post, title) {
-if (post) {
-try {
-const url = new URL(post)
-const parts = url.pathname
-.split('/')
-.filter(Boolean)
-
-  const slug = parts[parts.length - 1]
-
-  if (slug) {
-    return slug
+    ;[a[i], a[j]] = [a[j], a[i]]
   }
-} catch {}
 
-}
-
-if (title) {
-return title
-.toLowerCase()
-.trim()
-.replace(/[^a-z0-9]+/g, '-')
-.replace(/^-+|-+$/g, '')
-}
-
-return ''
+  return a
 }
 
 export default function Reels() {
-const location = useLocation()
+  const navigate = useNavigate()
+  const location = useLocation()
 
-const [videos, setVideos] = useState([])
-const [order, setOrder] = useState([])
-const [index, setIndex] = useState(0)
+  const [videos, setVideos] = useState([])
+  const [order, setOrder] = useState([])
+  const [index, setIndex] = useState(0)
 
-const [muted, setMuted] = useState(true)
-const [fit, setFit] = useState('fit')
-const [speed, setSpeed] = useState(1)
+  const [muted, setMuted] = useState(true)
+  const [fit, setFit] = useState('fit')
+  const [speed, setSpeed] = useState(1)
 
-const [dataLoading, setDataLoading] = useState(true)
-const [videoLoading, setVideoLoading] = useState(false)
-const [error, setError] = useState('')
+  const [dataLoading, setDataLoading] = useState(true)
+  const [videoLoading, setVideoLoading] = useState(false)
 
-const [progress, setProgress] = useState(0)
-const [flash, setFlash] = useState('')
-const [holdSpeedActive, setHoldSpeedActive] = useState(false)
+  const [error, setError] = useState('')
+  const [progress, setProgress] = useState(0)
+  const [flash, setFlash] = useState('')
+  const [holdSpeedActive, setHoldSpeedActive] = useState(false)
 
-const videoRefs = useRef({})
-const preloadRefs = useRef({})
+  const videoRefs = useRef([])
+  const preloadRefs = useRef({})
 
-const touchStart = useRef(null)
-const wheelLock = useRef(false)
+  const touchStart = useRef(null)
+  const wheelLock = useRef(false)
 
-const holdTimer = useRef(null)
-const videoLoadingTimer = useRef(null)
-const flashTimer = useRef(null)
+  const holdTimer = useRef(null)
+  const videoLoadingTimer = useRef(null)
 
-const wasPlayingBeforeHold = useRef(false)
-const longPressActive = useRef(false)
-const changingSpeed = useRef(false)
+  const wasPlayingBeforeHold = useRef(false)
+  const longPressActive = useRef(false)
 
-const videoRequestId = useRef(0)
+  const changingSpeed = useRef(false)
 
-const showFlash = useCallback((message) => {
-setFlash(message)
+  const videoRequestId = useRef(0)
 
-window.clearTimeout(flashTimer.current)
+  // ==================================================
+  // LOAD DATA
+  // ==================================================
 
-flashTimer.current = window.setTimeout(() => {
-  setFlash('')
-}, 1600)
+  useEffect(() => {
+    let cancelled = false
 
-}, [])
+    setDataLoading(true)
+    setError('')
 
-/* ---------------- LOAD DATA ---------------- */
-
-useEffect(() => {
-let cancelled = false
-
-setDataLoading(true)
-setError('')
-
-fetch('/data/videos.json', {
-  cache: 'no-store'
-})
-  .then((response) => {
-    if (!response.ok) {
-      throw new Error('Unable to load videos.')
-    }
-
-    return response.json()
-  })
-  .then((data) => {
-    if (cancelled) return
-
-    const list = Array.isArray(data)
-      ? data.filter((item) => item?.video)
-      : []
-
-    if (!list.length) {
-      throw new Error('No videos found.')
-    }
-
-    setVideos(list)
-
-    let shuffled = shuffle(list)
-
-    const params = new URLSearchParams(
-      location.search
-    )
-
-    const reelTitle = params.get('reel')
-
-    if (reelTitle) {
-      let decodedTitle = reelTitle
-
-      try {
-        decodedTitle = decodeURIComponent(reelTitle)
-      } catch {}
-
-      const targetIndex = shuffled.findIndex(
-        (video) =>
-          (video.title || '')
-            .trim()
-            .toLowerCase() ===
-          decodedTitle
-            .trim()
-            .toLowerCase()
-      )
-
-      if (targetIndex !== -1) {
-        const target = shuffled[targetIndex]
-
-        shuffled = [
-          target,
-          ...shuffled.filter(
-            (_, i) => i !== targetIndex
-          )
-        ]
-      }
-    }
-
-    setOrder(
-      shuffled.map((video) => list.indexOf(video))
-    )
-
-    setIndex(0)
-    setDataLoading(false)
-  })
-  .catch((err) => {
-    if (cancelled) return
-
-    setError(
-      err.message || 'Unable to load videos.'
-    )
-
-    setDataLoading(false)
-  })
-
-return () => {
-  cancelled = true
-}
-
-}, [location.search])
-
-const currentVideoIndex = order[index]
-const current = videos[currentVideoIndex]
-
-/* ---------------- NAVIGATION ---------------- */
-
-const go = useCallback(
-(delta) => {
-if (!order.length) return
-
-  window.clearTimeout(holdTimer.current)
-  window.clearTimeout(videoLoadingTimer.current)
-
-  videoRequestId.current += 1
-
-  setError('')
-  setVideoLoading(false)
-  setProgress(0)
-
-  setIndex((previous) => {
-    let next = previous + delta
-
-    if (next < 0) {
-      next = order.length - 1
-    }
-
-    if (next >= order.length) {
-      next = 0
-    }
-
-    return next
-  })
-},
-[order.length]
-
-)
-
-/* ---------------- PAUSE OTHER VIDEOS ---------------- */
-
-useEffect(() => {
-Object.entries(videoRefs.current).forEach(
-([position, video]) => {
-if (!video) return
-
-    if (Number(position) !== index) {
-      video.pause()
-    }
-  }
-)
-
-}, [index])
-
-/* ---------------- PLAY CURRENT VIDEO ---------------- */
-
-useEffect(() => {
-if (!current?.video) return
-
-const active = videoRefs.current[index]
-
-if (!active) return
-
-const requestId = ++videoRequestId.current
-
-window.clearTimeout(videoLoadingTimer.current)
-
-setError('')
-setProgress(0)
-setVideoLoading(false)
-
-active.muted = muted
-active.playbackRate = speed
-
-videoLoadingTimer.current = window.setTimeout(() => {
-  if (requestId !== videoRequestId.current) {
-    return
-  }
-
-  if (
-    active.paused ||
-    active.readyState < 3
-  ) {
-    setVideoLoading(true)
-  }
-}, 1000)
-
-const startVideo = async () => {
-  try {
-    active.load()
-
-    await active.play()
-
-    if (requestId !== videoRequestId.current) {
-      return
-    }
-
-    window.clearTimeout(
-      videoLoadingTimer.current
-    )
-
-    setVideoLoading(false)
-  } catch {
-    /*
-      Browser may block autoplay.
-      User can still interact with video.
-    */
-  }
-}
-
-startVideo()
-
-return () => {
-  window.clearTimeout(
-    videoLoadingTimer.current
-  )
-}
-
-}, [
-current?.video,
-index,
-muted,
-speed
-])
-
-/* ---------------- PRELOAD NEXT VIDEOS ---------------- */
-
-useEffect(() => {
-if (!order.length || !videos.length) {
-return
-}
-
-const nextVideos = []
-
-for (let i = 1; i <= 2; i++) {
-  const position =
-    (index + i) % order.length
-
-  const videoIndex = order[position]
-  const video = videos[videoIndex]
-
-  if (video?.video) {
-    nextVideos.push({
-      position,
-      video
+    fetch('/data/videos.json', {
+      cache: 'no-store'
     })
-  }
-}
+      .then((r) => {
+        if (!r.ok) {
+          throw new Error('Unable to load videos.json')
+        }
 
-Object.keys(preloadRefs.current).forEach(
-  (key) => {
-    const needed = nextVideos.some(
-      (item) =>
-        String(item.position) === key
-    )
+        return r.json()
+      })
+      .then((data) => {
+        if (cancelled) return
 
-    if (!needed) {
-      const element =
-        preloadRefs.current[key]
+        const list = Array.isArray(data) ? data : []
 
-      try {
-        element.pause()
-        element.removeAttribute('src')
-        element.load()
-      } catch {}
+        setVideos(list)
+        setOrder(shuffle(list.map((_, i) => i)))
+        setIndex(0)
+        setDataLoading(false)
+      })
+      .catch((e) => {
+        if (cancelled) return
 
-      delete preloadRefs.current[key]
+        setError(e.message)
+        setDataLoading(false)
+      })
+
+    return () => {
+      cancelled = true
     }
-  }
-)
+  }, [])
 
-nextVideos.forEach(({ position, video }) => {
-  if (preloadRefs.current[position]) {
-    return
-  }
+  // ==================================================
+  // CURRENT VIDEO
+  // ==================================================
 
-  const element =
-    document.createElement('video')
+  const current = order.length
+    ? videos[order[(index + order.length) % order.length]]
+    : null
 
-  element.preload = 'auto'
-  element.muted = true
-  element.playsInline = true
-  element.src = video.video
+  const getIndex = useCallback(
+    (i) => {
+      if (!order.length) return -1
 
-  preloadRefs.current[position] = element
-
-  try {
-    element.load()
-  } catch {}
-})
-
-}, [
-index,
-order,
-videos
-])
-
-/* ---------------- CONTROLS ---------------- */
-
-const toggleMute = () => {
-setMuted((value) => {
-const next = !value
-
-  Object.values(videoRefs.current).forEach(
-    (video) => {
-      if (video) {
-        video.muted = next
-      }
-    }
+      return order[(i + order.length) % order.length]
+    },
+    [order]
   )
 
-  return next
-})
+  // ==================================================
+  // GO TO NEXT / PREVIOUS REEL
+  // ==================================================
 
-}
+  const go = useCallback(
+    (delta) => {
+      if (!order.length) return
 
-const changeSpeed = () => {
-setSpeed((currentSpeed) => {
-const currentIndex =
-SPEEDS.indexOf(currentSpeed)
+      clearTimeout(holdTimer.current)
+      clearTimeout(videoLoadingTimer.current)
 
-  const nextIndex =
-    currentIndex === -1
-      ? 0
-      : (currentIndex + 1) % SPEEDS.length
+      longPressActive.current = false
 
-  const nextSpeed = SPEEDS[nextIndex]
+      setHoldSpeedActive(false)
 
-  Object.values(videoRefs.current).forEach(
-    (video) => {
-      if (video) {
-        video.playbackRate = nextSpeed
-      }
+      // Invalidate previous video events.
+      videoRequestId.current += 1
+
+      setError('')
+
+      // IMPORTANT:
+      // Do NOT show spinner immediately.
+      setVideoLoading(false)
+
+      setProgress(0)
+
+      setIndex((i) => i + delta)
+    },
+    [order.length]
+  )
+
+  // ==================================================
+  // URL REEL
+  // ==================================================
+
+  useEffect(() => {
+    if (!videos.length) return
+
+    const idxParam =
+      new URLSearchParams(location.search).get('reel')
+
+    if (!idxParam) return
+
+    let decoded = idxParam
+
+    try {
+      decoded = decodeURIComponent(idxParam)
+    } catch {}
+
+    const found = videos.findIndex(
+      (v) =>
+        (v.title || '').trim().toLowerCase() ===
+        decoded.trim().toLowerCase()
+    )
+
+    if (found >= 0) {
+      setOrder((prev) => {
+        const rest = prev.filter((x) => x !== found)
+
+        return [found, ...rest]
+      })
+
+      setIndex(0)
     }
-  )
+  }, [videos, location.search])
 
-  showFlash(`${nextSpeed}×`)
+  // ==================================================
+  // CURRENT VIDEO SETUP
+  //
+  // Spinner is delayed by 1 second.
+  // ==================================================
 
-  return nextSpeed
-})
+  useEffect(() => {
+    if (!videos.length || !order.length) return
 
-}
-
-const changeFit = () => {
-setFit((currentFit) => {
-const currentIndex =
-FITS.indexOf(currentFit)
-
-  const nextIndex =
-    currentIndex === -1
-      ? 0
-      : (currentIndex + 1) % FITS.length
-
-  const nextFit = FITS[nextIndex]
-
-  showFlash(nextFit)
-
-  return nextFit
-})
-
-}
-
-/* ---------------- LONG PRESS 2X ---------------- */
-
-const startHoldSpeed = () => {
-if (changingSpeed.current) {
-return
-}
-
-longPressActive.current = false
-
-window.clearTimeout(holdTimer.current)
-
-holdTimer.current = window.setTimeout(() => {
-  const active =
-    videoRefs.current[index]
-
-  if (!active) return
-
-  longPressActive.current = true
-  changingSpeed.current = true
-
-  wasPlayingBeforeHold.current =
-    !active.paused
-
-  active.playbackRate = 2
-
-  setHoldSpeedActive(true)
-}, 450)
-
-}
-
-const stopHoldSpeed = () => {
-window.clearTimeout(holdTimer.current)
-
-if (!holdSpeedActive) {
-  changingSpeed.current = false
-  return
-}
-
-const active =
-  videoRefs.current[index]
-
-if (active) {
-  active.playbackRate = speed
-
-  if (wasPlayingBeforeHold.current) {
-    active.play().catch(() => {})
-  }
-}
-
-setHoldSpeedActive(false)
-
-window.setTimeout(() => {
-  changingSpeed.current = false
-}, 50)
-
-}
-
-/* ---------------- PROGRESS ---------------- */
-
-const handleTimeUpdate = (event) => {
-const video = event.currentTarget
-
-if (
-  !video.duration ||
-  !Number.isFinite(video.duration)
-) {
-  setProgress(0)
-  return
-}
-
-setProgress(
-  (video.currentTime / video.duration) * 100
-)
-
-}
-
-const seek = (event) => {
-event.stopPropagation()
-
-const active =
-  videoRefs.current[index]
-
-if (
-  !active ||
-  !active.duration ||
-  !Number.isFinite(active.duration)
-) {
-  return
-}
-
-const rect =
-  event.currentTarget.getBoundingClientRect()
-
-const percentage =
-  (event.clientX - rect.left) / rect.width
-
-active.currentTime =
-  Math.max(
-    0,
-    Math.min(
-      active.duration,
-      active.duration * percentage
-    )
-  )
-
-}
-
-/* ---------------- SHARE ---------------- */
-
-const share = async () => {
-if (!current) return
-
-const slug = getSlug(
-  current.post,
-  current.title
-)
-
-if (!slug) {
-  showFlash('Unable to create share link')
-  return
-}
-
-const url =
-  `${window.location.origin}/share/` +
-  encodeURIComponent(slug)
-
-try {
-  if (navigator.share) {
-    await navigator.share({
-      title:
-        current.title ||
-        'Watch Video',
-      text:
-        current.title ||
-        'Watch Video',
-      url
-    })
-  } else if (navigator.clipboard) {
-    await navigator.clipboard.writeText(url)
-
-    showFlash('Link copied')
-  } else {
-    window.prompt(
-      'Copy this link:',
-      url
-    )
-  }
-} catch {}
-
-}
-
-/* ---------------- DOWNLOAD ---------------- */
-
-const download = () => {
-if (!current) return
-
-const downloadUrl =
-  current.download ||
-  current.video
-
-if (!downloadUrl) {
-  showFlash('Download unavailable')
-  return
-}
-
-const link =
-  document.createElement('a')
-
-link.href = downloadUrl
-link.download =
-  current.title || 'video'
-
-link.target = '_blank'
-link.rel =
-  'noopener noreferrer'
-
-document.body.appendChild(link)
-
-link.click()
-
-link.remove()
-
-}
-
-/* ---------------- FULLSCREEN ---------------- */
-
-const fullscreen = async () => {
-const active =
-videoRefs.current[index]
-
-if (!active) return
-
-try {
-  if (document.fullscreenElement) {
-    await document.exitFullscreen()
-    return
-  }
-
-  if (active.requestFullscreen) {
-    await active.requestFullscreen()
-  } else if (
-    active.webkitEnterFullscreen
-  ) {
-    active.webkitEnterFullscreen()
-  }
-} catch {}
-
-}
-
-/* ---------------- KEYBOARD ---------------- */
-
-useEffect(() => {
-const handleKeyDown = (event) => {
-if (
-event.target?.tagName === 'INPUT' ||
-event.target?.tagName === 'TEXTAREA'
-) {
-return
-}
-
-  if (
-    event.key === 'ArrowDown' ||
-    event.key === 'PageDown'
-  ) {
-    event.preventDefault()
-    go(1)
-  }
-
-  if (
-    event.key === 'ArrowUp' ||
-    event.key === 'PageUp'
-  ) {
-    event.preventDefault()
-    go(-1)
-  }
-
-  if (
-    event.key === 'm' ||
-    event.key === 'M'
-  ) {
-    toggleMute()
-  }
-
-  if (
-    event.key === 'f' ||
-    event.key === 'F'
-  ) {
-    fullscreen()
-  }
-
-  if (event.key === ' ') {
-    event.preventDefault()
-
-    const active =
-      videoRefs.current[index]
+    const active = videoRefs.current[index]
 
     if (!active) return
 
-    if (active.paused) {
-      active.play().catch(() => {})
-    } else {
-      active.pause()
+    clearTimeout(videoLoadingTimer.current)
+
+    videoRequestId.current += 1
+
+    const requestId = videoRequestId.current
+
+    setError('')
+    setProgress(0)
+
+    // IMPORTANT:
+    // Never show spinner immediately.
+    setVideoLoading(false)
+
+    // Stop every other rendered video.
+    videoRefs.current.forEach((v, i) => {
+      if (v && i !== index) {
+        try {
+          v.pause()
+          v.currentTime = 0
+        } catch {}
+      }
+    })
+
+    try {
+      active.muted = muted
+      active.playbackRate = speed
+
+      // Force current video to load.
+      active.load()
+
+      const playPromise = active.play()
+
+      if (playPromise) {
+        playPromise.catch(() => {})
+      }
+
+      // ----------------------------------------------
+      // WAIT 1 SECOND BEFORE SHOWING SPINNER
+      // ----------------------------------------------
+
+      videoLoadingTimer.current = setTimeout(() => {
+        if (requestId !== videoRequestId.current) {
+          return
+        }
+
+        const currentVideo =
+          videoRefs.current[index]
+
+        if (!currentVideo) return
+
+        // Video already playing.
+        if (
+          !currentVideo.paused &&
+          currentVideo.readyState >= 2
+        ) {
+          return
+        }
+
+        setVideoLoading(true)
+      }, 1000)
+    } catch {
+      setVideoLoading(false)
+      setError('Video could not be loaded.')
+    }
+
+    return () => {
+      clearTimeout(videoLoadingTimer.current)
+    }
+  }, [index, videos, order])
+
+  // ==================================================
+  // PRELOAD NEXT 2 VIDEOS
+  // ==================================================
+
+  useEffect(() => {
+    if (!videos.length || !order.length) return
+
+    const nextIndexes = []
+
+    for (let n = 1; n <= 2; n++) {
+      const position =
+        (index + n) % order.length
+
+      const videoIndex = order[position]
+
+      if (videoIndex !== undefined) {
+        nextIndexes.push(videoIndex)
+      }
+    }
+
+    // ----------------------------------------------
+    // REMOVE OLD PRELOADERS
+    // ----------------------------------------------
+
+    Object.keys(preloadRefs.current).forEach(
+      (key) => {
+        const videoIndex = Number(key)
+
+        if (!nextIndexes.includes(videoIndex)) {
+          const item =
+            preloadRefs.current[videoIndex]
+
+          if (item?.video) {
+            try {
+              item.video.pause()
+              item.video.removeAttribute('src')
+              item.video.load()
+            } catch {}
+          }
+
+          if (item?.timer) {
+            clearInterval(item.timer)
+          }
+
+          if (item?.timeout) {
+            clearTimeout(item.timeout)
+          }
+
+          delete preloadRefs.current[videoIndex]
+        }
+      }
+    )
+
+    // ----------------------------------------------
+    // CREATE NEXT 2 PRELOADERS
+    // ----------------------------------------------
+
+    nextIndexes.forEach((videoIndex) => {
+      const data = videos[videoIndex]
+
+      if (!data?.video) return
+
+      if (preloadRefs.current[videoIndex]) {
+        return
+      }
+
+      const preloadVideo =
+        document.createElement('video')
+
+      preloadVideo.preload = 'auto'
+      preloadVideo.muted = true
+      preloadVideo.playsInline = true
+
+      preloadVideo.setAttribute(
+        'playsinline',
+        ''
+      )
+
+      preloadVideo.setAttribute(
+        'webkit-playsinline',
+        'true'
+      )
+
+      preloadVideo.src = data.video
+
+      let stopped = false
+
+      const stopAfterFiveSeconds = () => {
+        if (stopped) return
+
+        try {
+          if (!preloadVideo.buffered.length) {
+            return
+          }
+
+          const bufferedEnd =
+            preloadVideo.buffered.end(
+              preloadVideo.buffered.length - 1
+            )
+
+          if (bufferedEnd >= 5) {
+            stopped = true
+
+            preloadVideo.pause()
+
+            preloadVideo.removeEventListener(
+              'progress',
+              stopAfterFiveSeconds
+            )
+
+            preloadVideo.removeEventListener(
+              'canprogress',
+              stopAfterFiveSeconds
+            )
+          }
+        } catch {}
+      }
+
+      preloadVideo.addEventListener(
+        'progress',
+        stopAfterFiveSeconds
+      )
+
+      preloadVideo.addEventListener(
+        'canprogress',
+        stopAfterFiveSeconds
+      )
+
+      preloadVideo.load()
+
+      const checkTimer = setInterval(() => {
+        if (stopped) {
+          clearInterval(checkTimer)
+          return
+        }
+
+        stopAfterFiveSeconds()
+      }, 250)
+
+      const safetyTimeout = setTimeout(() => {
+        clearInterval(checkTimer)
+      }, 15000)
+
+      preloadRefs.current[videoIndex] = {
+        video: preloadVideo,
+        timer: checkTimer,
+        timeout: safetyTimeout
+      }
+    })
+
+    // ----------------------------------------------
+    // CLEANUP
+    // ----------------------------------------------
+
+    return () => {
+      Object.keys(preloadRefs.current).forEach(
+        (key) => {
+          const item =
+            preloadRefs.current[key]
+
+          if (item?.video) {
+            try {
+              item.video.pause()
+              item.video.removeAttribute('src')
+              item.video.load()
+            } catch {}
+          }
+
+          if (item?.timer) {
+            clearInterval(item.timer)
+          }
+
+          if (item?.timeout) {
+            clearTimeout(item.timeout)
+          }
+        }
+      )
+
+      preloadRefs.current = {}
+    }
+  }, [index, videos, order])
+
+  // ==================================================
+  // MUTE
+  // ==================================================
+
+  useEffect(() => {
+    const active = videoRefs.current[index]
+
+    if (!active) return
+
+    active.muted = muted
+  }, [muted, index])
+
+  // ==================================================
+  // SPEED
+  // ==================================================
+
+  useEffect(() => {
+    const active = videoRefs.current[index]
+
+    if (!active) return
+
+    if (longPressActive.current) return
+
+    changingSpeed.current = true
+
+    active.playbackRate = speed
+
+    // Speed change should never cause spinner.
+    setVideoLoading(false)
+
+    const timer = setTimeout(() => {
+      changingSpeed.current = false
+    }, 500)
+
+    return () => {
+      clearTimeout(timer)
+    }
+  }, [speed, index])
+
+  // ==================================================
+  // KEYBOARD
+  // ==================================================
+
+  useEffect(() => {
+    const key = (e) => {
+      if (
+        e.key === 'ArrowDown' ||
+        e.key === 'PageDown'
+      ) {
+        e.preventDefault()
+        go(1)
+      }
+
+      if (
+        e.key === 'ArrowUp' ||
+        e.key === 'PageUp'
+      ) {
+        e.preventDefault()
+        go(-1)
+      }
+
+      if (e.key === 'm') {
+        setMuted((m) => !m)
+      }
+
+      if (e.key === 'f') {
+        toggleFullscreen()
+      }
+
+      if (
+        e.key === 'Escape' &&
+        document.fullscreenElement
+      ) {
+        document.exitFullscreen()
+      }
+    }
+
+    window.addEventListener(
+      'keydown',
+      key
+    )
+
+    return () => {
+      window.removeEventListener(
+        'keydown',
+        key
+      )
+    }
+  }, [go])
+
+  // ==================================================
+  // WHEEL
+  // ==================================================
+
+  useEffect(() => {
+    const onWheel = (e) => {
+      if (wheelLock.current) return
+
+      if (Math.abs(e.deltaY) < 25) return
+
+      wheelLock.current = true
+
+      go(e.deltaY > 0 ? 1 : -1)
+
+      setTimeout(() => {
+        wheelLock.current = false
+      }, 450)
+    }
+
+    window.addEventListener(
+      'wheel',
+      onWheel,
+      {
+        passive: false
+      }
+    )
+
+    return () => {
+      window.removeEventListener(
+        'wheel',
+        onWheel
+      )
+    }
+  }, [go])
+
+  // ==================================================
+  // SEEK
+  // ==================================================
+
+  const seek = (e) => {
+    const v = videoRefs.current[index]
+
+    if (!v || !v.duration) return
+
+    const r =
+      e.currentTarget.getBoundingClientRect()
+
+    v.currentTime =
+      ((e.clientX - r.left) / r.width) *
+      v.duration
+  }
+
+  // ==================================================
+  // FLASH
+  // ==================================================
+
+  const showFlash = (text) => {
+    setFlash(text)
+
+    setTimeout(() => {
+      setFlash('')
+    }, 700)
+  }
+
+  // ==================================================
+  // FULLSCREEN
+  // ==================================================
+
+  const toggleFullscreen = async () => {
+    const video = videoRefs.current[index]
+
+    if (!video) return
+
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen()
+        return
+      }
+
+      if (video.requestFullscreen) {
+        await video.requestFullscreen()
+        return
+      }
+
+      if (video.webkitEnterFullscreen) {
+        video.webkitEnterFullscreen()
+      }
+    } catch {}
+  }
+
+  // ==================================================
+  // FIT
+  // ==================================================
+
+  const toggleFit = () => {
+    setFit(
+      (f) =>
+        FITS[
+          (FITS.indexOf(f) + 1) %
+            FITS.length
+        ]
+    )
+  }
+
+  // ==================================================
+  // SPEED
+  // ==================================================
+
+  const toggleSpeed = () => {
+    setSpeed(
+      (s) =>
+        SPEEDS[
+          (SPEEDS.indexOf(s) + 1) %
+            SPEEDS.length
+        ]
+    )
+  }
+
+  // ==================================================
+  // SHARE
+  // ==================================================
+
+  const share = async () => {
+    if (!current) return
+
+    const url =
+      `${location.origin}/?reel=` +
+      encodeURIComponent(
+        current.title || ''
+      )
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title:
+            current.title ||
+            APP.name,
+          url
+        })
+      } else {
+        await navigator.clipboard.writeText(
+          url
+        )
+
+        showFlash('Link copied')
+      }
+    } catch {}
+  }
+
+  // ==================================================
+  // DOWNLOAD
+  // ==================================================
+
+  const download = () => {
+    if (!current?.download) return
+
+    const a =
+      document.createElement('a')
+
+    a.href = current.download
+    a.download = 'reel.mp4'
+    a.target = '_blank'
+    a.rel = 'noopener'
+
+    a.click()
+  }
+
+  // ==================================================
+  // TOUCH START
+  // ==================================================
+
+  const startTouch = (e) => {
+    if (!e.touches?.length) return
+
+    touchStart.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY
     }
   }
-}
 
-window.addEventListener(
-  'keydown',
-  handleKeyDown
-)
+  // ==================================================
+  // TOUCH END
+  // ==================================================
 
-return () => {
-  window.removeEventListener(
-    'keydown',
-    handleKeyDown
-  )
-}
+  const endTouch = (e) => {
+    if (!touchStart.current) return
 
-}, [go, index])
+    const dy =
+      e.changedTouches[0].clientY -
+      touchStart.current.y
 
-/* ---------------- MOUSE WHEEL ---------------- */
+    const dx =
+      e.changedTouches[0].clientX -
+      touchStart.current.x
 
-useEffect(() => {
-const handleWheel = (event) => {
-if (wheelLock.current) {
-return
-}
+    touchStart.current = null
 
-  if (Math.abs(event.deltaY) < 20) {
-    return
+    if (
+      Math.abs(dy) > 50 &&
+      Math.abs(dy) > Math.abs(dx)
+    ) {
+      go(dy < 0 ? 1 : -1)
+    }
   }
 
-  wheelLock.current = true
+  // ==================================================
+  // VIDEO CLICK
+  // ==================================================
 
-  go(
-    event.deltaY > 0
-      ? 1
-      : -1
-  )
+  const clickVideo = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
 
-  window.setTimeout(() => {
-    wheelLock.current = false
-  }, 450)
-}
+  // ==================================================
+  // LONG PRESS START
+  // ==================================================
 
-window.addEventListener(
-  'wheel',
-  handleWheel,
-  { passive: true }
-)
+  const holdStart = (e) => {
+    if (
+      e.pointerType === 'mouse' &&
+      e.button !== 0
+    ) {
+      return
+    }
 
-return () => {
-  window.removeEventListener(
-    'wheel',
-    handleWheel
-  )
-}
+    const v = videoRefs.current[index]
 
-}, [go])
+    if (!v) return
 
-/* ---------------- TOUCH ---------------- */
+    clearTimeout(holdTimer.current)
 
-const handleTouchStart = (event) => {
-if (!event.touches?.length) {
-return
-}
+    wasPlayingBeforeHold.current =
+      !v.paused
 
-touchStart.current = {
-  x: event.touches[0].clientX,
-  y: event.touches[0].clientY
-}
+    holdTimer.current =
+      setTimeout(() => {
+        const active =
+          videoRefs.current[index]
 
-}
+        if (!active) return
 
-const handleTouchEnd = (event) => {
-if (!touchStart.current) {
-return
-}
+        longPressActive.current = true
 
-if (!event.changedTouches?.length) {
-  return
-}
+        setHoldSpeedActive(true)
 
-const end =
-  event.changedTouches[0]
+        active.playbackRate = 2
 
-const deltaX =
-  end.clientX -
-  touchStart.current.x
+        if (
+          wasPlayingBeforeHold.current
+        ) {
+          active.play().catch(() => {})
+        }
+      }, 450)
+  }
 
-const deltaY =
-  end.clientY -
-  touchStart.current.y
+  // ==================================================
+  // LONG PRESS END
+  // ==================================================
 
-touchStart.current = null
+  const holdEnd = () => {
+    clearTimeout(holdTimer.current)
 
-if (Math.abs(deltaY) < 50) {
-  return
-}
+    const v = videoRefs.current[index]
 
-if (
-  Math.abs(deltaY) <
-  Math.abs(deltaX)
-) {
-  return
-}
+    if (!v) return
 
-go(
-  deltaY < 0
-    ? 1
-    : -1
-)
+    if (longPressActive.current) {
+      longPressActive.current = false
 
-}
+      setHoldSpeedActive(false)
 
-/* ---------------- VIDEO ERROR ---------------- */
+      v.playbackRate = speed
 
-const handleVideoError = () => {
-window.clearTimeout(
-videoLoadingTimer.current
-)
+      // Never pause after releasing.
+      if (
+        wasPlayingBeforeHold.current
+      ) {
+        v.play().catch(() => {})
+      }
+    }
+  }
 
-setVideoLoading(false)
+  // ==================================================
+  // CLEANUP
+  // ==================================================
 
-setError(
-  'Unable to play this video.'
-)
+  useEffect(() => {
+    return () => {
+      clearTimeout(
+        holdTimer.current
+      )
 
-}
+      clearTimeout(
+        videoLoadingTimer.current
+      )
 
-const retryVideo = () => {
-setError('')
+      Object.keys(
+        preloadRefs.current
+      ).forEach((key) => {
+        const item =
+          preloadRefs.current[key]
 
-const active =
-  videoRefs.current[index]
+        if (item?.video) {
+          try {
+            item.video.pause()
+            item.video.removeAttribute('src')
+            item.video.load()
+          } catch {}
+        }
 
-if (!active) return
+        if (item?.timer) {
+          clearInterval(item.timer)
+        }
 
-try {
-  active.load()
+        if (item?.timeout) {
+          clearTimeout(item.timeout)
+        }
+      })
 
-  active.play().catch(() => {})
-} catch {}
+      preloadRefs.current = {}
+    }
+  }, [])
 
-}
+  // ==================================================
+  // DATA LOADING
+  // ==================================================
 
-/* ---------------- LOADING ---------------- */
+  if (dataLoading) {
+    return (
+      <div className="loading-screen">
+        <div className="big-loader" />
+      </div>
+    )
+  }
 
-if (dataLoading) {
-return (
-<main className="reels-app">
-<div className="loading-screen">
-<div className="big-loader" />
-</div>
-</main>
-)
-}
-
-if (error && !current) {
-return (
-<main className="reels-app">
-<div className="error-screen">
-<div>
-<h1>
-Unable to load videos
-</h1>
-
+  if (error && !videos.length) {
+    return (
+      <div className="error-screen">
         <p>{error}</p>
 
         <button
-          type="button"
           onClick={() =>
             window.location.reload()
           }
@@ -889,388 +884,625 @@ Unable to load videos
           Retry
         </button>
       </div>
-    </div>
-  </main>
-)
+    )
+  }
 
-}
+  if (!current) {
+    return (
+      <div className="error-screen">
+        <p>No reels found.</p>
+      </div>
+    )
+  }
 
-if (!current) {
-return (
-<main className="reels-app">
-<div className="error-screen">
-<h1>
-No video available
-</h1>
-</div>
-</main>
-)
-}
+  // ==================================================
+  // THREE VISIBLE POSITIONS
+  // ==================================================
 
-/* ---------------- VISIBLE REELS ---------------- */
+  const wrappers =
+    [-1, 0, 1].map((offset) => ({
+      offset,
+      i: index + offset,
+      data:
+        videos[
+          getIndex(index + offset)
+        ]
+    }))
 
-const positions = [-1, 0, 1]
+  // ==================================================
+  // RENDER
+  // ==================================================
 
-return (
-<main className="reels-app" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} >
-{/* VIDEO LAYER */}
-<div className="video-container">
-{positions.map((offset) => {
-let position = index + offset
+  return (
+    <main
+      className="reels-app"
+      onTouchStart={startTouch}
+      onTouchEnd={endTouch}
+    >
 
-      if (position < 0) {
-        position = order.length - 1
-      }
+      {/* ============================================
+          LIVE BUTTON
+      ============================================ */}
 
-      if (position >= order.length) {
-        position = 0
-      }
-
-      const videoIndex =
-        order[position]
-
-      const video =
-        videos[videoIndex]
-
-      if (!video) {
-        return null
-      }
-
-      const isCurrent =
-        offset === 0
-
-      return (
-        <div
-          key={`${video.video}-${position}`}
-          className="video-wrapper"
-          style={{
-            transform:
-              `translateY(${offset * 100}%)`
-          }}
+      <div className="live-button">
+        <button
+          onClick={() =>
+            navigate('/live')
+          }
         >
-          <video
-            ref={(element) => {
-              if (element) {
-                videoRefs.current[position] =
-                  element
-              } else {
-                delete videoRefs.current[position]
-              }
-            }}
-            className="reel-video"
-            src={video.video}
-            muted={muted}
-            playsInline
-            autoPlay={isCurrent}
-            preload={
-              isCurrent
-                ? 'auto'
-                : 'metadata'
-            }
-            style={{
-              objectFit:
-                fit === 'fill'
-                  ? 'cover'
-                  : fit === 'fit'
-                    ? 'contain'
-                    : 'cover'
-            }}
-            onTimeUpdate={
-              isCurrent
-                ? handleTimeUpdate
-                : undefined
-            }
-            onEnded={
-              isCurrent
-                ? () => go(1)
-                : undefined
-            }
-            onError={
-              isCurrent
-                ? handleVideoError
-                : undefined
-            }
+          <img
+            src="/assets/live.png"
+            alt=""
           />
 
-          {isCurrent &&
-            videoLoading && (
-              <div className="spinner">
-                <div className="loader" />
-              </div>
-            )}
-
-          {isCurrent &&
-            error && (
-              <div className="error-msg">
-                <p>{error}</p>
-
-                <button
-                  type="button"
-                  onClick={retryVideo}
-                >
-                  Retry
-                </button>
-              </div>
-            )}
-        </div>
-      )
-    })}
-  </div>
-
-  {/* PREVIOUS / NEXT TOUCH AREAS */}
-  <button
-    type="button"
-    aria-label="Previous video"
-    onClick={() => {
-      if (longPressActive.current) {
-        longPressActive.current = false
-        return
-      }
-
-      go(-1)
-    }}
-    onPointerDown={startHoldSpeed}
-    onPointerUp={stopHoldSpeed}
-    onPointerCancel={stopHoldSpeed}
-    onPointerLeave={stopHoldSpeed}
-    style={{
-      position: 'fixed',
-      top: 0,
-      bottom: 0,
-      left: 0,
-      width: '35%',
-      border: 0,
-      padding: 0,
-      margin: 0,
-      background: 'transparent',
-      zIndex: 2000,
-      cursor: 'pointer'
-    }}
-  />
-
-  <button
-    type="button"
-    aria-label="Next video"
-    onClick={() => {
-      if (longPressActive.current) {
-        longPressActive.current = false
-        return
-      }
-
-      go(1)
-    }}
-    onPointerDown={startHoldSpeed}
-    onPointerUp={stopHoldSpeed}
-    onPointerCancel={stopHoldSpeed}
-    onPointerLeave={stopHoldSpeed}
-    style={{
-      position: 'fixed',
-      top: 0,
-      bottom: 0,
-      right: 0,
-      width: '35%',
-      border: 0,
-      padding: 0,
-      margin: 0,
-      background: 'transparent',
-      zIndex: 2000,
-      cursor: 'pointer'
-    }}
-  />
-
-  {/* LOGO */}
-  {APP?.logo ? (
-    <div
-      className="brand-logo"
-      style={{
-        zIndex: 10001
-      }}
-    >
-      <img
-        src={APP.logo}
-        alt={
-          APP?.name ||
-          'XLive'
-        }
-      />
-    </div>
-  ) : (
-    <div
-      className="brand-logo"
-      style={{
-        zIndex: 10001,
-        color: '#fff',
-        fontSize: '20px',
-        fontWeight: 'bold',
-        textShadow: '0 0 5px #000'
-      }}
-    >
-      {APP?.name || 'XLive'}
-    </div>
-  )}
-
-  {/* RIGHT CONTROLS */}
-  <div
-    className="top-controls"
-    style={{
-      zIndex: 10000
-    }}
-  >
-    <ControlButton
-      src={
-        muted
-          ? '/assets/mute.png'
-          : '/assets/unmute.png'
-      }
-      alt={
-        muted
-          ? 'Unmute'
-          : 'Mute'
-      }
-      title={
-        muted
-          ? 'Unmute'
-          : 'Mute'
-      }
-      onClick={(event) => {
-        event.stopPropagation()
-        toggleMute()
-      }}
-    />
-
-    <ControlButton
-      src="/assets/share.png"
-      alt="Share"
-      title="Share"
-      onClick={(event) => {
-        event.stopPropagation()
-        share()
-      }}
-    />
-
-    <ControlButton
-      src="/assets/fullscreen-logo.png"
-      alt="Fullscreen"
-      title="Fullscreen"
-      onClick={(event) => {
-        event.stopPropagation()
-        fullscreen()
-      }}
-    />
-
-    <ControlButton
-      src="/assets/download.png"
-      alt="Download"
-      title="Download"
-      onClick={(event) => {
-        event.stopPropagation()
-        download()
-      }}
-    />
-
-    <ControlButton
-      label={`${speed}x`}
-      title={`Speed ${speed}x`}
-      onClick={(event) => {
-        event.stopPropagation()
-        changeSpeed()
-      }}
-    />
-
-    <ControlButton
-      label={fit}
-      title={`Fit ${fit}`}
-      onClick={(event) => {
-        event.stopPropagation()
-        changeFit()
-      }}
-    />
-  </div>
-
-  {/* VIDEO INFORMATION */}
-  <div
-    className="video-info"
-    style={{
-      zIndex: 10001
-    }}
-  >
-    {current.title && (
-      <div className="video-title">
-        {current.title}
+          <span>LIVE</span>
+        </button>
       </div>
-    )}
 
-    {current.post && (
-      <button
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation()
+      {/* ============================================
+          LOGO
+      ============================================ */}
 
-          window.open(
-            current.post,
-            '_blank',
-            'noopener,noreferrer'
-          )
-        }}
-        style={{
-          pointerEvents: 'auto',
-          border: 0,
-          background:
-            'rgba(0,0,0,0.6)',
-          color: '#fff',
-          padding: '7px 10px',
-          cursor: 'pointer'
+      <div
+        className="brand-logo"
+        onClick={() => {
+          setIndex(0)
+          navigate('/')
         }}
       >
-        View Post
-      </button>
-    )}
-  </div>
+        <img
+          src="/assets/your-logo.png"
+          alt={APP.name}
+        />
+      </div>
 
-  {/* PROGRESS BAR */}
-  <div
-    className="global-progress-container"
-    onClick={seek}
-    style={{
-      zIndex: 10000
-    }}
-  >
-    <div
-      className="global-progress-bar"
-      style={{
-        width: `${progress}%`
-      }}
-    />
-  </div>
+      {/* ============================================
+          VIDEO CONTAINER
+      ============================================ */}
 
-  {/* LONG PRESS INDICATOR */}
-  {holdSpeedActive && (
-    <div
-      className="seek-flash"
-      style={{
-        top: '50%',
-        bottom: 'auto',
-        transform:
-          'translateY(-50%)',
-        zIndex: 10002
-      }}
-    >
-      2×
-    </div>
-  )}
+      <div className="video-container">
 
-  {/* FLASH MESSAGE */}
-  {flash && (
-    <div
-      className="seek-flash"
-      style={{
-        zIndex: 10002
-      }}
-    >
-      {flash}
-    </div>
-  )}
-</main>
+        {wrappers.map(
+          ({
+            offset,
+            i,
+            data
+          }) =>
+            data ? (
+              <article
+                key={`${getIndex(
+                  i
+                )}-${i}`}
+                className="video-wrapper"
+                style={{
+                  transform:
+                    `translateY(${offset * 100}%)`
+                }}
+              >
 
-)
+                <video
+                  ref={(el) => {
+                    videoRefs.current[i] =
+                      el
+                  }}
+
+                  /*
+                   * IMPORTANT:
+                   *
+                   * NO poster.
+                   *
+                   * Only current video gets
+                   * preload="auto".
+                   *
+                   * Previous / next visible
+                   * wrappers do not preload.
+                   */
+
+                  src={data.video}
+
+                  preload={
+                    i === index
+                      ? 'auto'
+                      : 'none'
+                  }
+
+                  playsInline
+                  webkit-playsinline="true"
+
+                  muted={muted}
+
+                  loop={false}
+
+                  draggable={false}
+
+                  controls={false}
+
+                  // --------------------------------
+                  // NO CONTEXT MENU
+                  // --------------------------------
+
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                  }}
+
+                  onDragStart={(e) => {
+                    e.preventDefault()
+                  }}
+
+                  // --------------------------------
+                  // CLICK
+                  // --------------------------------
+
+                  onClick={clickVideo}
+
+                  // --------------------------------
+                  // VIDEO STYLE
+                  // --------------------------------
+
+                  style={{
+                    objectFit:
+                      fit === 'fill'
+                        ? 'cover'
+                        : fit === 'fit'
+                          ? 'contain'
+                          : 'cover',
+
+                    WebkitTouchCallout:
+                      'none',
+
+                    WebkitUserSelect:
+                      'none',
+
+                    userSelect:
+                      'none',
+
+                    WebkitTapHighlightColor:
+                      'transparent'
+                  }}
+
+                  // =================================
+                  // VIDEO LOADING EVENTS
+                  // =================================
+
+                  onLoadStart={() => {
+                    if (i !== index) return
+
+                    /*
+                     * DO NOT show spinner here.
+                     *
+                     * Spinner is intentionally
+                     * delayed by 1 second.
+                     */
+
+                    setError('')
+                  }}
+
+                  onLoadedMetadata={(e) => {
+                    if (i !== index) return
+
+                    const video =
+                      e.currentTarget
+
+                    video.muted = muted
+                    video.playbackRate = speed
+                  }}
+
+                  onCanPlay={() => {
+                    if (i !== index) return
+
+                    clearTimeout(
+                      videoLoadingTimer.current
+                    )
+
+                    setVideoLoading(false)
+                    setError('')
+                  }}
+
+                  onPlaying={() => {
+                    if (i !== index) return
+
+                    clearTimeout(
+                      videoLoadingTimer.current
+                    )
+
+                    setVideoLoading(false)
+                    setError('')
+
+                    changingSpeed.current =
+                      false
+                  }}
+
+                  // --------------------------------
+                  // BUFFERING
+                  //
+                  // Also wait 1 second before
+                  // showing spinner.
+                  // --------------------------------
+
+                  onWaiting={() => {
+                    if (
+                      i !== index ||
+                      changingSpeed.current ||
+                      longPressActive.current
+                    ) {
+                      return
+                    }
+
+                    clearTimeout(
+                      videoLoadingTimer.current
+                    )
+
+                    videoLoadingTimer.current =
+                      setTimeout(() => {
+                        const v =
+                          videoRefs.current[
+                            index
+                          ]
+
+                        if (!v) return
+
+                        if (
+                          v.paused ||
+                          v.readyState < 3
+                        ) {
+                          setVideoLoading(true)
+                        }
+                      }, 1000)
+                  }}
+
+                  onStalled={() => {
+                    if (i !== index) return
+
+                    if (
+                      changingSpeed.current ||
+                      longPressActive.current
+                    ) {
+                      return
+                    }
+
+                    clearTimeout(
+                      videoLoadingTimer.current
+                    )
+
+                    videoLoadingTimer.current =
+                      setTimeout(() => {
+                        const v =
+                          videoRefs.current[
+                            index
+                          ]
+
+                        if (!v) return
+
+                        if (
+                          v.paused ||
+                          v.readyState < 3
+                        ) {
+                          setVideoLoading(true)
+                        }
+                      }, 1000)
+                  }}
+
+                  // --------------------------------
+                  // ERROR
+                  // --------------------------------
+
+                  onError={() => {
+                    if (i !== index) return
+
+                    clearTimeout(
+                      videoLoadingTimer.current
+                    )
+
+                    setVideoLoading(false)
+
+                    setError(
+                      'Video could not be loaded.'
+                    )
+                  }}
+
+                  // --------------------------------
+                  // PROGRESS
+                  // --------------------------------
+
+                  onTimeUpdate={(e) => {
+                    if (i !== index) return
+
+                    const video =
+                      e.currentTarget
+
+                    if (
+                      video.duration &&
+                      Number.isFinite(
+                        video.duration
+                      )
+                    ) {
+                      setProgress(
+                        (video.currentTime /
+                          video.duration) *
+                          100
+                      )
+                    }
+                  }}
+
+                  // --------------------------------
+                  // VIDEO ENDED
+                  // --------------------------------
+
+                  onEnded={() => {
+                    if (i === index) {
+                      go(1)
+                    }
+                  }}
+
+                  // =================================
+                  // LONG PRESS 2X
+                  // =================================
+
+                  onPointerDown={
+                    holdStart
+                  }
+
+                  onPointerUp={
+                    holdEnd
+                  }
+
+                  onPointerCancel={
+                    holdEnd
+                  }
+
+                  onPointerLeave={
+                    holdEnd
+                  }
+                />
+
+                {/* ==================================
+                    VIDEO INFO
+                ================================== */}
+
+                <div className="video-info">
+
+                  <div className="video-title">
+                    {data.isLive
+                      ? '🔴 Live - '
+                      : ''}
+
+                    {data.title}
+                  </div>
+
+                </div>
+
+              </article>
+            ) : null
+        )}
+
+      </div>
+
+      {/* ============================================
+          VIDEO LOADING SPINNER
+          
+          This is ONLY displayed after the
+          1-second delay.
+      ============================================ */}
+
+      {videoLoading && !error && (
+        <div className="spinner">
+          <div className="loader" />
+        </div>
+      )}
+
+      {/* ============================================
+          VIDEO ERROR
+      ============================================ */}
+
+      {error && (
+        <div className="error-msg">
+
+          <div>
+            {error}
+          </div>
+
+          <button
+            onClick={() => {
+              const v =
+                videoRefs.current[
+                  index
+                ]
+
+              clearTimeout(
+                videoLoadingTimer.current
+              )
+
+              setError('')
+
+              // Don't immediately show spinner.
+              setVideoLoading(false)
+
+              setProgress(0)
+
+              if (!v) {
+                setError(
+                  'Video could not be loaded.'
+                )
+
+                return
+              }
+
+              try {
+                v.load()
+
+                const playPromise =
+                  v.play()
+
+                if (playPromise) {
+                  playPromise.catch(
+                    () => {}
+                  )
+                }
+
+                // Retry also waits 1 second
+                // before showing spinner.
+                videoLoadingTimer.current =
+                  setTimeout(() => {
+                    if (
+                      v.paused ||
+                      v.readyState < 2
+                    ) {
+                      setVideoLoading(true)
+                    }
+                  }, 1000)
+              } catch {
+                setVideoLoading(false)
+
+                setError(
+                  'Video could not be loaded.'
+                )
+              }
+            }}
+          >
+            Retry
+          </button>
+
+        </div>
+      )}
+
+      {/* ============================================
+          RIGHT CONTROLS
+      ============================================ */}
+
+      <div className="top-controls">
+
+        {/* MUTE */}
+
+        <ControlButton
+          icon={
+            muted
+              ? '/assets/mute.png'
+              : '/assets/unmute.png'
+          }
+          onClick={() =>
+            setMuted((m) => !m)
+          }
+          title={
+            muted
+              ? 'Unmute'
+              : 'Mute'
+          }
+        />
+
+        {/* FIT */}
+
+        <ControlButton
+          label={
+            fit === 'fit'
+              ? 'Fit'
+              : fit === 'fill'
+                ? 'Fill'
+                : 'Auto'
+          }
+          onClick={toggleFit}
+          title="Change video fit"
+        />
+
+        {/* SPEED */}
+
+        <ControlButton
+          label={`${speed}x`}
+          onClick={toggleSpeed}
+          title="Change video speed"
+        />
+
+        {/* FULLSCREEN */}
+
+        <ControlButton
+          icon="/assets/fullscreen-logo.png"
+          onClick={
+            toggleFullscreen
+          }
+          title="Fullscreen"
+        />
+
+        {/* DOWNLOAD */}
+
+        {current.download && (
+          <ControlButton
+            icon="/assets/download.png"
+            onClick={download}
+            title="Download"
+          />
+        )}
+
+        {/* SHARE */}
+
+        <ControlButton
+          icon="/assets/share.png"
+          onClick={share}
+          title="Share"
+        />
+
+        {/* LOGOUT */}
+
+        <ControlButton
+          icon="/assets/logout.png"
+          onClick={() => {
+            localStorage.removeItem(
+              'xlive_logged_in'
+            )
+
+            navigate('/login', {
+              replace: true
+            })
+          }}
+          title="Logout"
+        />
+
+      </div>
+
+      {/* ============================================
+          PROGRESS BAR
+      ============================================ */}
+
+      <div
+        className="global-progress-container"
+        onClick={seek}
+      >
+        <div
+          className="global-progress-bar"
+          style={{
+            width: `${progress}%`
+          }}
+        />
+      </div>
+
+      {/* ============================================
+          2X INDICATOR
+      ============================================ */}
+
+      {holdSpeedActive && (
+        <div className="seek-flash">
+          2×
+        </div>
+      )}
+
+      {/* ============================================
+          NORMAL FLASH
+      ============================================ */}
+
+      {flash &&
+        !holdSpeedActive && (
+          <div className="seek-flash">
+            {flash}
+          </div>
+        )}
+
+      {/* ============================================
+          REEL COUNTER
+      ============================================ */}
+
+      <div className="reel-counter">
+        {index + 1} / {order.length}
+      </div>
+
+    </main>
+  )
 }
+
