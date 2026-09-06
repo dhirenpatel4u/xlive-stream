@@ -63,7 +63,7 @@ export default function Reels() {
   const videoRequestId = useRef(0)
 
   /*
-   * Flash message
+   * Flash
    */
   const showFlash = useCallback((message) => {
     setFlash(message)
@@ -89,9 +89,7 @@ export default function Reels() {
     })
       .then((response) => {
         if (!response.ok) {
-          throw new Error(
-            'Unable to load videos.'
-          )
+          throw new Error('Unable to load videos.')
         }
 
         return response.json()
@@ -100,74 +98,50 @@ export default function Reels() {
         if (cancelled) return
 
         const list = Array.isArray(data)
-          ? data.filter(
-              (item) => item?.video
-            )
+          ? data.filter((item) => item?.video)
           : []
 
         if (!list.length) {
-          throw new Error(
-            'No videos found.'
-          )
+          throw new Error('No videos found.')
         }
 
         setVideos(list)
 
         let shuffled = shuffle(list)
 
-        /*
-         * Support:
-         *
-         * /?reel=VIDEO_TITLE
-         */
-        const params =
-          new URLSearchParams(
-            location.search
-          )
+        const params = new URLSearchParams(
+          location.search
+        )
 
-        const reelTitle =
-          params.get('reel')
+        const reelTitle = params.get('reel')
 
         if (reelTitle) {
-          let decodedTitle =
-            reelTitle
+          let decodedTitle = reelTitle
 
           try {
-            decodedTitle =
-              decodeURIComponent(
-                reelTitle
-              )
+            decodedTitle = decodeURIComponent(reelTitle)
           } catch {}
 
-          const targetIndex =
-            shuffled.findIndex(
-              (video) =>
-                (video.title || '')
-                  .trim()
-                  .toLowerCase() ===
-                decodedTitle
-                  .trim()
-                  .toLowerCase()
-            )
+          const targetIndex = shuffled.findIndex(
+            (video) =>
+              (video.title || '').trim().toLowerCase() ===
+              decodedTitle.trim().toLowerCase()
+          )
 
           if (targetIndex !== -1) {
-            const target =
-              shuffled[targetIndex]
+            const target = shuffled[targetIndex]
 
             shuffled = [
               target,
               ...shuffled.filter(
-                (_, i) =>
-                  i !== targetIndex
+                (_, i) => i !== targetIndex
               )
             ]
           }
         }
 
         setOrder(
-          shuffled.map((video) =>
-            list.indexOf(video)
-          )
+          shuffled.map((video) => list.indexOf(video))
         )
 
         setIndex(0)
@@ -177,8 +151,7 @@ export default function Reels() {
         if (cancelled) return
 
         setError(
-          err.message ||
-            'Unable to load videos.'
+          err.message || 'Unable to load videos.'
         )
 
         setDataLoading(false)
@@ -192,11 +165,8 @@ export default function Reels() {
   /*
    * Current video
    */
-  const currentVideoIndex =
-    order[index]
-
-  const current =
-    videos[currentVideoIndex]
+  const currentVideoIndex = order[index]
+  const current = videos[currentVideoIndex]
 
   /*
    * Go next / previous
@@ -205,13 +175,8 @@ export default function Reels() {
     (delta) => {
       if (!order.length) return
 
-      window.clearTimeout(
-        holdTimer.current
-      )
-
-      window.clearTimeout(
-        videoLoadingTimer.current
-      )
+      window.clearTimeout(holdTimer.current)
+      window.clearTimeout(videoLoadingTimer.current)
 
       videoRequestId.current += 1
 
@@ -220,17 +185,13 @@ export default function Reels() {
       setProgress(0)
 
       setIndex((previous) => {
-        let next =
-          previous + delta
+        let next = previous + delta
 
         if (next < 0) {
-          next =
-            order.length - 1
+          next = order.length - 1
         }
 
-        if (
-          next >= order.length
-        ) {
+        if (next >= order.length) {
           next = 0
         }
 
@@ -241,18 +202,14 @@ export default function Reels() {
   )
 
   /*
-   * Stop videos that aren't current
+   * Stop inactive videos
    */
   useEffect(() => {
-    Object.entries(
-      videoRefs.current
-    ).forEach(
+    Object.entries(videoRefs.current).forEach(
       ([position, video]) => {
         if (!video) return
 
-        if (
-          Number(position) !== index
-        ) {
+        if (Number(position) !== index) {
           video.pause()
         }
       }
@@ -265,8 +222,7 @@ export default function Reels() {
   useEffect(() => {
     if (!current?.video) return
 
-    const active =
-      videoRefs.current[index]
+    const active = videoRefs.current[index]
 
     if (!active) return
 
@@ -284,10 +240,6 @@ export default function Reels() {
     active.muted = muted
     active.playbackRate = speed
 
-    /*
-     * Show spinner only after 1 second
-     * if video hasn't started.
-     */
     videoLoadingTimer.current =
       window.setTimeout(() => {
         if (
@@ -305,32 +257,31 @@ export default function Reels() {
         }
       }, 1000)
 
-    const startVideo =
-      async () => {
-        try {
-          active.load()
+    const startVideo = async () => {
+      try {
+        active.load()
 
-          await active.play()
+        await active.play()
 
-          if (
-            requestId !==
-            videoRequestId.current
-          ) {
-            return
-          }
-
-          window.clearTimeout(
-            videoLoadingTimer.current
-          )
-
-          setVideoLoading(false)
-        } catch {
-          /*
-           * Browser autoplay can fail.
-           * Keep the video visible.
-           */
+        if (
+          requestId !==
+          videoRequestId.current
+        ) {
+          return
         }
+
+        window.clearTimeout(
+          videoLoadingTimer.current
+        )
+
+        setVideoLoading(false)
+      } catch {
+        /*
+         * Autoplay may be blocked.
+         * Video remains visible.
+         */
       }
+    }
 
     startVideo()
 
@@ -347,7 +298,7 @@ export default function Reels() {
   ])
 
   /*
-   * Preload next 2 videos
+   * Preload next 2
    */
   useEffect(() => {
     if (
@@ -359,14 +310,9 @@ export default function Reels() {
 
     const nextVideos = []
 
-    for (
-      let i = 1;
-      i <= 2;
-      i++
-    ) {
+    for (let i = 1; i <= 2; i++) {
       const position =
-        (index + i) %
-        order.length
+        (index + i) % order.length
 
       const videoIndex =
         order[position]
@@ -388,9 +334,7 @@ export default function Reels() {
       const needed =
         nextVideos.some(
           (item) =>
-            String(
-              item.position
-            ) === key
+            String(item.position) === key
         )
 
       if (!needed) {
@@ -399,32 +343,24 @@ export default function Reels() {
 
         try {
           element.pause()
-          element.removeAttribute(
-            'src'
-          )
+          element.removeAttribute('src')
           element.load()
         } catch {}
 
-        delete preloadRefs.current[
-          key
-        ]
+        delete preloadRefs.current[key]
       }
     })
 
     nextVideos.forEach(
       ({ position, video }) => {
         if (
-          preloadRefs.current[
-            position
-          ]
+          preloadRefs.current[position]
         ) {
           return
         }
 
         const element =
-          document.createElement(
-            'video'
-          )
+          document.createElement('video')
 
         element.preload = 'auto'
         element.muted = true
@@ -436,11 +372,8 @@ export default function Reels() {
           () => {
             try {
               if (
-                element.buffered
-                  .length &&
-                element.buffered.end(
-                  0
-                ) >= 5
+                element.buffered.length &&
+                element.buffered.end(0) >= 5
               ) {
                 element.pause()
               }
@@ -448,9 +381,8 @@ export default function Reels() {
           }
         )
 
-        preloadRefs.current[
-          position
-        ] = element
+        preloadRefs.current[position] =
+          element
 
         try {
           element.load()
@@ -467,155 +399,122 @@ export default function Reels() {
    * Mute
    */
   const toggleMute = () => {
-    setMuted(
-      (value) => !value
-    )
+    setMuted((value) => !value)
   }
 
   /*
-   * Playback speed
+   * Speed
    */
   const changeSpeed = () => {
-    setSpeed(
-      (currentSpeed) => {
-        const currentIndex =
-          SPEEDS.indexOf(
-            currentSpeed
-          )
+    setSpeed((currentSpeed) => {
+      const currentIndex =
+        SPEEDS.indexOf(currentSpeed)
 
-        const nextIndex =
-          currentIndex === -1
-            ? 0
-            : (
-                currentIndex + 1
-              ) %
-                SPEEDS.length
+      const nextIndex =
+        currentIndex === -1
+          ? 0
+          : (currentIndex + 1) %
+            SPEEDS.length
 
-        const nextSpeed =
-          SPEEDS[nextIndex]
+      const nextSpeed =
+        SPEEDS[nextIndex]
 
-        Object.values(
-          videoRefs.current
-        ).forEach((video) => {
-          if (video) {
-            video.playbackRate =
-              nextSpeed
-          }
-        })
+      Object.values(
+        videoRefs.current
+      ).forEach((video) => {
+        if (video) {
+          video.playbackRate =
+            nextSpeed
+        }
+      })
 
-        return nextSpeed
-      }
-    )
+      return nextSpeed
+    })
   }
 
   /*
    * Long press = 2x
    */
-  const startHoldSpeed =
-    () => {
-      if (
-        changingSpeed.current
-      ) {
-        return
-      }
-
-      longPressActive.current =
-        false
-
-      window.clearTimeout(
-        holdTimer.current
-      )
-
-      holdTimer.current =
-        window.setTimeout(() => {
-          const active =
-            videoRefs.current[
-              index
-            ]
-
-          if (!active) return
-
-          longPressActive.current =
-            true
-
-          changingSpeed.current =
-            true
-
-          wasPlayingBeforeHold.current =
-            !active.paused
-
-          active.playbackRate = 2
-
-          setHoldSpeedActive(
-            true
-          )
-        }, 450)
+  const startHoldSpeed = () => {
+    if (changingSpeed.current) {
+      return
     }
 
-  const stopHoldSpeed =
-    () => {
-      window.clearTimeout(
-        holdTimer.current
-      )
+    longPressActive.current = false
 
-      if (
-        !holdSpeedActive
-      ) {
-        changingSpeed.current =
-          false
-        return
-      }
+    window.clearTimeout(
+      holdTimer.current
+    )
 
-      const active =
-        videoRefs.current[index]
-
-      if (active) {
-        active.playbackRate =
-          speed
-
-        if (
-          wasPlayingBeforeHold.current
-        ) {
-          active
-            .play()
-            .catch(() => {})
-        }
-      }
-
-      setHoldSpeedActive(
-        false
-      )
-
+    holdTimer.current =
       window.setTimeout(() => {
-        changingSpeed.current =
-          false
-      }, 50)
+        const active =
+          videoRefs.current[index]
+
+        if (!active) return
+
+        longPressActive.current = true
+        changingSpeed.current = true
+
+        wasPlayingBeforeHold.current =
+          !active.paused
+
+        active.playbackRate = 2
+
+        setHoldSpeedActive(true)
+      }, 450)
+  }
+
+  const stopHoldSpeed = () => {
+    window.clearTimeout(
+      holdTimer.current
+    )
+
+    if (!holdSpeedActive) {
+      changingSpeed.current = false
+      return
     }
+
+    const active =
+      videoRefs.current[index]
+
+    if (active) {
+      active.playbackRate = speed
+
+      if (
+        wasPlayingBeforeHold.current
+      ) {
+        active.play().catch(() => {})
+      }
+    }
+
+    setHoldSpeedActive(false)
+
+    window.setTimeout(() => {
+      changingSpeed.current = false
+    }, 50)
+  }
 
   /*
    * Progress
    */
-  const handleTimeUpdate =
-    (event) => {
-      const video =
-        event.currentTarget
+  const handleTimeUpdate = (event) => {
+    const video = event.currentTarget
 
-      if (
-        !video.duration ||
-        !Number.isFinite(
-          video.duration
-        )
-      ) {
-        setProgress(0)
-        return
-      }
-
-      setProgress(
-        (video.currentTime /
-          video.duration) *
-          100
-      )
+    if (
+      !video.duration ||
+      !Number.isFinite(video.duration)
+    ) {
+      setProgress(0)
+      return
     }
+
+    setProgress(
+      (video.currentTime /
+        video.duration) *
+        100
+    )
+  }
 
   /*
    * Seek
@@ -637,8 +536,7 @@ export default function Reels() {
       event.currentTarget.getBoundingClientRect()
 
     const percentage =
-      (event.clientX -
-        rect.left) /
+      (event.clientX - rect.left) /
       rect.width
 
     active.currentTime =
@@ -646,23 +544,13 @@ export default function Reels() {
         0,
         Math.min(
           active.duration,
-          active.duration *
-            percentage
+          active.duration * percentage
         )
       )
   }
 
   /*
    * Share
-   *
-   * JSON:
-   *
-   * "post":
-   * "https://viralmms.com/post/punjabi-kudi"
-   *
-   * Generates:
-   *
-   * /share/punjabi-kudi
    */
   const share = async () => {
     if (!current) return
@@ -672,9 +560,7 @@ export default function Reels() {
     if (current.post) {
       try {
         const postUrl =
-          new URL(
-            current.post
-          )
+          new URL(current.post)
 
         const parts =
           postUrl.pathname
@@ -682,21 +568,13 @@ export default function Reels() {
             .filter(Boolean)
 
         slug =
-          parts[
-            parts.length - 1
-          ] || ''
+          parts[parts.length - 1] || ''
       } catch {
         slug = ''
       }
     }
 
-    /*
-     * Fallback to title.
-     */
-    if (
-      !slug &&
-      current.title
-    ) {
+    if (!slug && current.title) {
       slug = current.title
         .toLowerCase()
         .trim()
@@ -706,7 +584,8 @@ export default function Reels() {
         )
         .replace(
           /^-+|-+$/g,
-          '')
+          ''
+        )
     }
 
     if (!slug) {
@@ -721,9 +600,7 @@ export default function Reels() {
       encodeURIComponent(slug)
 
     try {
-      if (
-        navigator.share
-      ) {
+      if (navigator.share) {
         await navigator.share({
           title:
             current.title ||
@@ -736,13 +613,9 @@ export default function Reels() {
       } else if (
         navigator.clipboard
       ) {
-        await navigator.clipboard.writeText(
-          url
-        )
+        await navigator.clipboard.writeText(url)
 
-        showFlash(
-          'Link copied'
-        )
+        showFlash('Link copied')
       } else {
         window.prompt(
           'Copy this link:',
@@ -751,7 +624,7 @@ export default function Reels() {
       }
     } catch {
       /*
-       * User cancelled.
+       * User cancelled sharing.
        */
     }
   }
@@ -774,16 +647,13 @@ export default function Reels() {
       current.download
 
     link.download =
-      current.title ||
-      'video'
+      current.title || 'video'
 
     link.target = '_blank'
     link.rel =
       'noopener noreferrer'
 
-    document.body.appendChild(
-      link
-    )
+    document.body.appendChild(link)
 
     link.click()
 
@@ -793,127 +663,105 @@ export default function Reels() {
   /*
    * Fullscreen
    */
-  const fullscreen =
-    async () => {
-      const active =
-        videoRefs.current[index]
+  const fullscreen = async () => {
+    const active =
+      videoRefs.current[index]
 
-      if (!active) return
+    if (!active) return
 
-      try {
-        if (
-          document.fullscreenElement
-        ) {
-          await document.exitFullscreen()
-          return
-        }
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen()
+        return
+      }
 
-        if (
-          active.requestFullscreen
-        ) {
-          await active.requestFullscreen()
-        } else if (
-          active.webkitEnterFullscreen
-        ) {
-          active.webkitEnterFullscreen()
-        }
-      } catch {}
-    }
+      if (active.requestFullscreen) {
+        await active.requestFullscreen()
+      } else if (
+        active.webkitEnterFullscreen
+      ) {
+        active.webkitEnterFullscreen()
+      }
+    } catch {}
+  }
 
   /*
-   * Fit mode
+   * Fit
    */
   const changeFit = () => {
-    setFit(
-      (currentFit) => {
-        const currentIndex =
-          FITS.indexOf(
-            currentFit
-          )
+    setFit((currentFit) => {
+      const currentIndex =
+        FITS.indexOf(currentFit)
 
-        const nextIndex =
-          currentIndex === -1
-            ? 0
-            : (
-                currentIndex + 1
-              ) %
-                FITS.length
+      const nextIndex =
+        currentIndex === -1
+          ? 0
+          : (currentIndex + 1) %
+            FITS.length
 
-        return FITS[nextIndex]
-      }
-    )
+      return FITS[nextIndex]
+    })
   }
 
   /*
    * Keyboard
    */
   useEffect(() => {
-    const handleKeyDown =
-      (event) => {
-        if (
-          event.target?.tagName ===
-            'INPUT' ||
-          event.target?.tagName ===
-            'TEXTAREA'
-        ) {
-          return
-        }
+    const handleKeyDown = (event) => {
+      if (
+        event.target?.tagName ===
+          'INPUT' ||
+        event.target?.tagName ===
+          'TEXTAREA'
+      ) {
+        return
+      }
 
-        if (
-          event.key ===
-            'ArrowDown' ||
-          event.key ===
-            'PageDown'
-        ) {
-          event.preventDefault()
-          go(1)
-        }
+      if (
+        event.key === 'ArrowDown' ||
+        event.key === 'PageDown'
+      ) {
+        event.preventDefault()
+        go(1)
+      }
 
-        if (
-          event.key ===
-            'ArrowUp' ||
-          event.key ===
-            'PageUp'
-        ) {
-          event.preventDefault()
-          go(-1)
-        }
+      if (
+        event.key === 'ArrowUp' ||
+        event.key === 'PageUp'
+      ) {
+        event.preventDefault()
+        go(-1)
+      }
 
-        if (
-          event.key === 'm' ||
-          event.key === 'M'
-        ) {
-          toggleMute()
-        }
+      if (
+        event.key === 'm' ||
+        event.key === 'M'
+      ) {
+        toggleMute()
+      }
 
-        if (
-          event.key === 'f' ||
-          event.key === 'F'
-        ) {
-          fullscreen()
-        }
+      if (
+        event.key === 'f' ||
+        event.key === 'F'
+      ) {
+        fullscreen()
+      }
 
-        if (
-          event.key === ' '
-        ) {
-          event.preventDefault()
+      if (event.key === ' ') {
+        event.preventDefault()
 
-          const active =
-            videoRefs.current[
-              index
-            ]
+        const active =
+          videoRefs.current[index]
 
-          if (!active) return
+        if (!active) return
 
-          if (active.paused) {
-            active
-              .play()
-              .catch(() => {})
-          } else {
-            active.pause()
-          }
+        if (active.paused) {
+          active.play().catch(() => {})
+        } else {
+          active.pause()
         }
       }
+    }
 
     window.addEventListener(
       'keydown',
@@ -932,43 +780,34 @@ export default function Reels() {
    * Mouse wheel
    */
   useEffect(() => {
-    const handleWheel =
-      (event) => {
-        if (
-          wheelLock.current
-        ) {
-          return
-        }
-
-        if (
-          Math.abs(
-            event.deltaY
-          ) < 20
-        ) {
-          return
-        }
-
-        wheelLock.current =
-          true
-
-        go(
-          event.deltaY > 0
-            ? 1
-            : -1
-        )
-
-        window.setTimeout(() => {
-          wheelLock.current =
-            false
-        }, 450)
+    const handleWheel = (event) => {
+      if (wheelLock.current) {
+        return
       }
+
+      if (
+        Math.abs(event.deltaY) < 20
+      ) {
+        return
+      }
+
+      wheelLock.current = true
+
+      go(
+        event.deltaY > 0
+          ? 1
+          : -1
+      )
+
+      window.setTimeout(() => {
+        wheelLock.current = false
+      }, 450)
+    }
 
     window.addEventListener(
       'wheel',
       handleWheel,
-      {
-        passive: true
-      }
+      { passive: true }
     )
 
     return () => {
@@ -982,90 +821,78 @@ export default function Reels() {
   /*
    * Touch start
    */
-  const handleTouchStart =
-    (event) => {
-      if (
-        !event.touches?.length
-      ) {
-        return
-      }
-
-      touchStart.current = {
-        x:
-          event.touches[0]
-            .clientX,
-        y:
-          event.touches[0]
-            .clientY
-      }
+  const handleTouchStart = (event) => {
+    if (!event.touches?.length) {
+      return
     }
+
+    touchStart.current = {
+      x: event.touches[0].clientX,
+      y: event.touches[0].clientY
+    }
+  }
 
   /*
    * Touch end
    */
-  const handleTouchEnd =
-    (event) => {
-      if (
-        !touchStart.current
-      ) {
-        return
-      }
-
-      if (
-        !event.changedTouches
-          ?.length
-      ) {
-        return
-      }
-
-      const end =
-        event.changedTouches[0]
-
-      const deltaX =
-        end.clientX -
-        touchStart.current.x
-
-      const deltaY =
-        end.clientY -
-        touchStart.current.y
-
-      touchStart.current = null
-
-      if (
-        Math.abs(deltaY) < 50
-      ) {
-        return
-      }
-
-      if (
-        Math.abs(deltaY) <
-        Math.abs(deltaX)
-      ) {
-        return
-      }
-
-      go(
-        deltaY < 0
-          ? 1
-          : -1
-      )
+  const handleTouchEnd = (event) => {
+    if (!touchStart.current) {
+      return
     }
+
+    if (
+      !event.changedTouches?.length
+    ) {
+      return
+    }
+
+    const end =
+      event.changedTouches[0]
+
+    const deltaX =
+      end.clientX -
+      touchStart.current.x
+
+    const deltaY =
+      end.clientY -
+      touchStart.current.y
+
+    touchStart.current = null
+
+    if (
+      Math.abs(deltaY) < 50
+    ) {
+      return
+    }
+
+    if (
+      Math.abs(deltaY) <
+      Math.abs(deltaX)
+    ) {
+      return
+    }
+
+    go(
+      deltaY < 0
+        ? 1
+        : -1
+    )
+  }
 
   /*
    * Video error
    */
-  const handleVideoError =
-    () => {
-      window.clearTimeout(
-        videoLoadingTimer.current
-      )
+  const handleVideoError = () => {
+    window.clearTimeout(
+      videoLoadingTimer.current
+    )
 
-      setVideoLoading(false)
+    setVideoLoading(false)
 
-      setError(
-        'Unable to play this video.'
-      )
-    }
+    setError(
+      'Unable to play this video.'
+    )
+  }
 
   /*
    * Retry
@@ -1081,9 +908,7 @@ export default function Reels() {
     try {
       active.load()
 
-      active
-        .play()
-        .catch(() => {})
+      active.play().catch(() => {})
     } catch {}
   }
 
@@ -1092,9 +917,9 @@ export default function Reels() {
    */
   if (dataLoading) {
     return (
-      <main className="reels-page">
-        <div className="reels-loading">
-          Loading...
+      <main className="reels-app">
+        <div className="loading-screen">
+          <div className="big-loader" />
         </div>
       </main>
     )
@@ -1108,22 +933,24 @@ export default function Reels() {
     !current
   ) {
     return (
-      <main className="reels-page">
-        <div className="reels-error">
-          <h1>
-            Unable to load videos
-          </h1>
+      <main className="reels-app">
+        <div className="error-screen">
+          <div>
+            <h1>
+              Unable to load videos
+            </h1>
 
-          <p>{error}</p>
+            <p>{error}</p>
 
-          <button
-            type="button"
-            onClick={() =>
-              window.location.reload()
-            }
-          >
-            Retry
-          </button>
+            <button
+              type="button"
+              onClick={() =>
+                window.location.reload()
+              }
+            >
+              Retry
+            </button>
+          </div>
         </div>
       </main>
     )
@@ -1134,8 +961,8 @@ export default function Reels() {
    */
   if (!current) {
     return (
-      <main className="reels-page">
-        <div className="reels-error">
+      <main className="reels-app">
+        <div className="error-screen">
           <h1>
             No video available
           </h1>
@@ -1151,132 +978,125 @@ export default function Reels() {
 
   return (
     <main
-      className={`reels-page fit-${fit}`}
-      onTouchStart={
-        handleTouchStart
-      }
-      onTouchEnd={
-        handleTouchEnd
-      }
+      className="reels-app"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
     >
-      <div className="reels-container">
+      <div className="video-container">
 
-        {wrappers.map(
-          (offset) => {
-            let position =
-              index + offset
+        {wrappers.map((offset) => {
+          let position =
+            index + offset
 
-            if (position < 0) {
-              position =
-                order.length - 1
-            }
-
-            if (
-              position >=
-              order.length
-            ) {
-              position = 0
-            }
-
-            const videoIndex =
-              order[position]
-
-            const video =
-              videos[videoIndex]
-
-            if (!video) {
-              return null
-            }
-
-            const isCurrent =
-              offset === 0
-
-            return (
-              <div
-                key={`${video.video}-${position}`}
-                className="video-wrapper"
-                style={{
-                  transform:
-                    `translateY(${offset * 100}%)`
-                }}
-              >
-                <video
-                  ref={(element) => {
-                    if (element) {
-                      videoRefs.current[
-                        position
-                      ] = element
-                    } else {
-                      delete videoRefs
-                        .current[
-                          position
-                        ]
-                    }
-                  }}
-                  className={`reel-video ${
-                    fit === 'fill'
-                      ? 'video-fill'
-                      : fit === 'auto'
-                        ? 'video-auto'
-                        : 'video-fit'
-                  }`}
-                  src={video.video}
-                  muted={muted}
-                  playsInline
-                  autoPlay={isCurrent}
-                  preload={
-                    isCurrent
-                      ? 'auto'
-                      : 'metadata'
-                  }
-                  onTimeUpdate={
-                    isCurrent
-                      ? handleTimeUpdate
-                      : undefined
-                  }
-                  onEnded={
-                    isCurrent
-                      ? () => go(1)
-                      : undefined
-                  }
-                  onError={
-                    isCurrent
-                      ? handleVideoError
-                      : undefined
-                  }
-                />
-
-                {isCurrent &&
-                  videoLoading && (
-                    <div className="video-loading">
-                      <div className="loading-spinner" />
-                    </div>
-                  )}
-
-                {isCurrent &&
-                  error && (
-                    <div className="video-error">
-                      <p>{error}</p>
-
-                      <button
-                        type="button"
-                        onClick={
-                          retryVideo
-                        }
-                      >
-                        Retry
-                      </button>
-                    </div>
-                  )}
-              </div>
-            )
+          if (position < 0) {
+            position =
+              order.length - 1
           }
-        )}
 
-        {/* Previous / long press zone */}
+          if (
+            position >=
+            order.length
+          ) {
+            position = 0
+          }
+
+          const videoIndex =
+            order[position]
+
+          const video =
+            videos[videoIndex]
+
+          if (!video) {
+            return null
+          }
+
+          const isCurrent =
+            offset === 0
+
+          return (
+            <div
+              key={`${video.video}-${position}`}
+              className="video-wrapper"
+              style={{
+                transform:
+                  `translateY(${offset * 100}%)`
+              }}
+            >
+              <video
+                ref={(element) => {
+                  if (element) {
+                    videoRefs.current[
+                      position
+                    ] = element
+                  } else {
+                    delete videoRefs
+                      .current[position]
+                  }
+                }}
+                className={
+                  isCurrent
+                    ? 'reel-video'
+                    : 'reel-video'
+                }
+                src={video.video}
+                muted={muted}
+                playsInline
+                autoPlay={isCurrent}
+                preload={
+                  isCurrent
+                    ? 'auto'
+                    : 'metadata'
+                }
+                style={{
+                  objectFit:
+                    fit === 'fill'
+                      ? 'cover'
+                      : 'contain'
+                }}
+                onTimeUpdate={
+                  isCurrent
+                    ? handleTimeUpdate
+                    : undefined
+                }
+                onEnded={
+                  isCurrent
+                    ? () => go(1)
+                    : undefined
+                }
+                onError={
+                  isCurrent
+                    ? handleVideoError
+                    : undefined
+                }
+              />
+
+              {isCurrent &&
+                videoLoading && (
+                  <div className="spinner">
+                    <div className="loader" />
+                  </div>
+                )}
+
+              {isCurrent &&
+                error && (
+                  <div className="error-msg">
+                    <p>{error}</p>
+
+                    <button
+                      type="button"
+                      onClick={retryVideo}
+                    >
+                      Retry
+                    </button>
+                  </div>
+                )}
+            </div>
+          )
+        })}
+
+        {/* Previous navigation zone */}
         <button
           type="button"
-          className="reel-prev-zone"
           aria-label="Previous video"
           onClick={() => {
             if (
@@ -1289,24 +1109,28 @@ export default function Reels() {
 
             go(-1)
           }}
-          onPointerDown={
-            startHoldSpeed
-          }
-          onPointerUp={
-            stopHoldSpeed
-          }
-          onPointerCancel={
-            stopHoldSpeed
-          }
-          onPointerLeave={
-            stopHoldSpeed
-          }
+          onPointerDown={startHoldSpeed}
+          onPointerUp={stopHoldSpeed}
+          onPointerCancel={stopHoldSpeed}
+          onPointerLeave={stopHoldSpeed}
+          style={{
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
+            left: 0,
+            width: '35%',
+            border: 0,
+            padding: 0,
+            margin: 0,
+            background: 'transparent',
+            zIndex: 900,
+            cursor: 'pointer'
+          }}
         />
 
-        {/* Next / long press zone */}
+        {/* Next navigation zone */}
         <button
           type="button"
-          className="reel-next-zone"
           aria-label="Next video"
           onClick={() => {
             if (
@@ -1319,34 +1143,47 @@ export default function Reels() {
 
             go(1)
           }}
-          onPointerDown={
-            startHoldSpeed
-          }
-          onPointerUp={
-            stopHoldSpeed
-          }
-          onPointerCancel={
-            stopHoldSpeed
-          }
-          onPointerLeave={
-            stopHoldSpeed
-          }
+          onPointerDown={startHoldSpeed}
+          onPointerUp={stopHoldSpeed}
+          onPointerCancel={stopHoldSpeed}
+          onPointerLeave={stopHoldSpeed}
+          style={{
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
+            right: 0,
+            width: '35%',
+            border: 0,
+            padding: 0,
+            margin: 0,
+            background: 'transparent',
+            zIndex: 900,
+            cursor: 'pointer'
+          }}
         />
 
         {/* 2x indicator */}
         {holdSpeedActive && (
-          <div className="hold-speed-indicator">
+          <div
+            className="seek-flash"
+            style={{
+              top: '50%',
+              bottom: 'auto',
+              transform:
+                'translateY(-50%)'
+            }}
+          >
             2×
           </div>
         )}
 
-        {/* Progress bar */}
+        {/* Progress */}
         <div
-          className="video-progress-container"
+          className="global-progress-container"
           onClick={seek}
         >
           <div
-            className="video-progress"
+            className="global-progress-bar"
             style={{
               width:
                 `${progress}%`
@@ -1355,7 +1192,7 @@ export default function Reels() {
         </div>
 
         {/* Right controls */}
-        <div className="reels-controls">
+        <div className="top-controls">
 
           <ControlButton
             src={
@@ -1368,9 +1205,7 @@ export default function Reels() {
                 ? 'Unmute'
                 : 'Mute'
             }
-            onClick={
-              toggleMute
-            }
+            onClick={toggleMute}
           />
 
           <ControlButton
@@ -1382,33 +1217,25 @@ export default function Reels() {
           <ControlButton
             src="/assets/fullscreen-logo.png"
             alt="Fullscreen"
-            onClick={
-              fullscreen
-            }
+            onClick={fullscreen}
           />
 
           <ControlButton
             src="/assets/download.png"
             alt="Download"
-            onClick={
-              download
-            }
+            onClick={download}
           />
 
           <ControlButton
             alt={`Speed ${speed}x`}
-            onClick={
-              changeSpeed
-            }
+            onClick={changeSpeed}
           >
             {speed}x
           </ControlButton>
 
           <ControlButton
             alt={`Fit ${fit}`}
-            onClick={
-              changeFit
-            }
+            onClick={changeFit}
           >
             {fit}
           </ControlButton>
@@ -1416,24 +1243,33 @@ export default function Reels() {
         </div>
 
         {/* Video information */}
-        <div className="reel-info">
+        <div className="video-info">
 
           {current.title && (
-            <h1>
+            <div className="video-title">
               {current.title}
-            </h1>
+            </div>
           )}
 
           {current.post && (
             <button
               type="button"
-              className="reel-post-button"
               onClick={() => {
                 window.open(
                   current.post,
                   '_blank',
                   'noopener,noreferrer'
                 )
+              }}
+              style={{
+                pointerEvents: 'auto',
+                border: 0,
+                background:
+                  'rgba(0,0,0,0.6)',
+                color: '#fff',
+                padding:
+                  '7px 10px',
+                cursor: 'pointer'
               }}
             >
               View Post
@@ -1444,26 +1280,36 @@ export default function Reels() {
 
         {/* App logo / name */}
         {APP?.logo && (
-          <img
-            className="reels-app-logo"
-            src={APP.logo}
-            alt={
-              APP?.name ||
-              'XLive'
-            }
-          />
+          <div className="brand-logo">
+            <img
+              src={APP.logo}
+              alt={
+                APP?.name ||
+                'XLive'
+              }
+            />
+          </div>
         )}
 
         {!APP?.logo &&
           APP?.name && (
-            <div className="reels-app-name">
+            <div
+              className="brand-logo"
+              style={{
+                color: '#fff',
+                fontSize: '20px',
+                fontWeight: 'bold',
+                textShadow:
+                  '0 0 5px #000'
+              }}
+            >
               {APP.name}
             </div>
           )}
 
         {/* Flash */}
         {flash && (
-          <div className="reels-flash">
+          <div className="seek-flash">
             {flash}
           </div>
         )}
