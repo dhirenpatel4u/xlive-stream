@@ -6,21 +6,21 @@ import { APP } from '../config'
 const FITS = ['fit', 'fill', 'auto']
 const SPEEDS = [1, 1.25, 1.5, 2]
 
-function shuffle(arr) {
-  const a = [...arr]
+function shuffle(array) {
+  const result = [...array]
 
-  for (let i = a.length - 1; i > 0; i--) {
+  for (let i = result.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
 
-    ;[a[i], a[j]] = [a[j], a[i]]
+    ;[result[i], result[j]] = [result[j], result[i]]
   }
 
-  return a
+  return result
 }
 
 export default function Reels() {
-  const navigate = useNavigate()
   const location = useLocation()
+  const navigate = useNavigate()
 
   const [videos, setVideos] = useState([])
   const [order, setOrder] = useState([])
@@ -32,13 +32,13 @@ export default function Reels() {
 
   const [dataLoading, setDataLoading] = useState(true)
   const [videoLoading, setVideoLoading] = useState(false)
-
   const [error, setError] = useState('')
+
   const [progress, setProgress] = useState(0)
   const [flash, setFlash] = useState('')
   const [holdSpeedActive, setHoldSpeedActive] = useState(false)
 
-  const videoRefs = useRef([])
+  const videoRefs = useRef({})
   const preloadRefs = useRef({})
 
   const touchStart = useRef(null)
@@ -49,14 +49,23 @@ export default function Reels() {
 
   const wasPlayingBeforeHold = useRef(false)
   const longPressActive = useRef(false)
-
   const changingSpeed = useRef(false)
+
   const videoRequestId = useRef(0)
 
-  // ==================================================
-  // LOAD DATA
-  // ==================================================
+  const showFlash = useCallback((message) => {
+    setFlash(message)
 
+    window.clearTimeout(showFlash.timer)
+
+    showFlash.timer = window.setTimeout(() => {
+      setFlash('')
+    }, 1600)
+  }, [])
+
+  /*
+   * Load videos.json
+   */
   useEffect(() => {
     let cancelled = false
 
@@ -66,65 +75,89 @@ export default function Reels() {
     fetch('/data/videos.json', {
       cache: 'no-store'
     })
-      .then((r) => {
-        if (!r.ok) {
-          throw new Error('Unable to load videos.json')
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error('Unable to load videos.')
         }
 
-        return r.json()
+        return response.json()
       })
       .then((data) => {
         if (cancelled) return
 
-        const list = Array.isArray(data) ? data : []
+        const list = Array.isArray(data)
+          ? data.filter((item) => item?.video)
+          : []
+
+        if (!list.length) {
+          throw new Error('No videos found.')
+        }
 
         setVideos(list)
-        setOrder(shuffle(list.map((_, i) => i)))
+
+        /*
+         * Check for:
+         * /?reel=VIDEO_TITLE
+         */
+        const params = new URLSearchParams(location.search)
+        const reelTitle = params.get('reel')
+
+        let shuffled = shuffle(list)
+
+        if (reelTitle) {
+          let decodedTitle = reelTitle
+
+          try {
+            decodedTitle = decodeURIComponent(reelTitle)
+          } catch {}
+
+          const targetIndex = shuffled.findIndex(
+            (video) =>
+              (video.title || '').trim().toLowerCase() ===
+              decodedTitle.trim().toLowerCase()
+          )
+
+          if (targetIndex !== -1) {
+            const target = shuffled[targetIndex]
+
+            shuffled = [
+              target,
+              ...shuffled.filter((_, i) => i !== targetIndex)
+            ]
+          }
+        }
+
+        setOrder(shuffled.map((_, i) => i))
         setIndex(0)
         setDataLoading(false)
       })
-      .catch((e) => {
+      .catch((err) => {
         if (cancelled) return
 
-        setError(e.message || 'Unable to load videos.')
+        setError(err.message || 'Unable to load videos.')
         setDataLoading(false)
       })
 
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [location.search])
 
-  // ==================================================
-  // CURRENT VIDEO
-  // ==================================================
+  /*
+   * Current video
+   */
+  const currentVideoIndex = order[index]
+  const current = videos[currentVideoIndex]
 
-  const current = order.length
-    ? videos[order[(index + order.length) % order.length]]
-    : null
-
-  const getIndex = useCallback(
-    (i) => {
-      if (!order.length) return -1
-
-      return order[(i + order.length) % order.length]
-    },
-    [order]
-  )
-
-  // ==================================================
-  // NEXT / PREVIOUS
-  // ==================================================
-
+  /*
+   * Navigation
+   */
   const go = useCallback(
     (delta) => {
-      if (!order.length) return
+      if (!videos.length || !order.length) return
 
-      clearTimeout(holdTimer.current)
-      clearTimeout(videoLoadingTimer.current)
-
-      longPressActive.current = false
-      setHoldSpeedActive(false)
+      window.clearTimeout(holdTimer.current)
+      window.clearTimeout(videoLoadingTimer.current)
 
       videoRequestId.current += 1
 
@@ -132,439 +165,440 @@ export default function Reels() {
       setVideoLoading(false)
       setProgress(0)
 
-      setIndex((i) => i + delta)
+      setIndex((previous) => {
+        let next = previous + delta
+
+        if (next < 0) {
+          next = order.length - 1
+        }
+
+        if (next >= order.length) {
+          next = 0
+        }
+
+        return next
+      })
     },
-    [order.length]
+    [videos.length, order.length]
   )
 
-  // ==================================================
-  // OPEN REEL FROM ?reel=
-  // ==================================================
-
+  /*
+   * Stop all videos except active video
+   */
   useEffect(() => {
-    if (!videos.length) return
+    Object.entries(videoRefs.current).forEach(([key, video]) => {
+      if (!video) return
 
-    const reelParam =
-      new URLSearchParams(location.search).get('reel')
+      if (Number(key) !== index) {
+        video.pause()
+      }
+    })
+  }, [index])
 
-    if (!reelParam) return
-
-    let decoded = reelParam
-
-    try {
-      decoded = decodeURIComponent(reelParam)
-    } catch {}
-
-    const found = videos.findIndex(
-      (v) =>
-        (v.title || '').trim().toLowerCase() ===
-        decoded.trim().toLowerCase()
-    )
-
-    if (found >= 0) {
-      setOrder((prev) => {
-        const rest = prev.filter((x) => x !== found)
-
-        return [found, ...rest]
-      })
-
-      setIndex(0)
-    }
-  }, [videos, location.search])
-
-  // ==================================================
-  // CURRENT VIDEO SETUP
-  // ==================================================
-
+  /*
+   * Setup active video
+   */
   useEffect(() => {
-    if (!videos.length || !order.length) return
+    if (!current?.video) return
 
     const active = videoRefs.current[index]
 
     if (!active) return
 
-    clearTimeout(videoLoadingTimer.current)
+    const requestId = ++videoRequestId.current
 
-    videoRequestId.current += 1
-
-    const requestId = videoRequestId.current
+    window.clearTimeout(videoLoadingTimer.current)
 
     setError('')
     setProgress(0)
-
-    // No spinner immediately.
     setVideoLoading(false)
 
-    // Stop other videos.
-    videoRefs.current.forEach((v, i) => {
-      if (v && i !== index) {
-        try {
-          v.pause()
-          v.currentTime = 0
-        } catch {}
-      }
-    })
+    active.muted = muted
+    active.playbackRate = speed
 
-    try {
-      active.muted = muted
-      active.playbackRate = speed
+    /*
+     * Do not show spinner immediately.
+     * Only show it if video is still not playing
+     * after one second.
+     */
+    const showSpinner = () => {
+      if (requestId !== videoRequestId.current) return
 
-      active.load()
-
-      const playPromise = active.play()
-
-      if (playPromise) {
-        playPromise.catch(() => {})
-      }
-
-      // Show spinner only after 1 second.
-      videoLoadingTimer.current = setTimeout(() => {
-        if (requestId !== videoRequestId.current) {
-          return
-        }
-
-        const currentVideo =
-          videoRefs.current[index]
-
-        if (!currentVideo) return
-
-        if (
-          !currentVideo.paused &&
-          currentVideo.readyState >= 2
-        ) {
-          return
-        }
-
+      if (
+        active.paused ||
+        active.readyState < 3
+      ) {
         setVideoLoading(true)
-      }, 1000)
-    } catch {
-      setVideoLoading(false)
-      setError('Video could not be loaded.')
+      }
     }
+
+    videoLoadingTimer.current =
+      window.setTimeout(showSpinner, 1000)
+
+    const playVideo = async () => {
+      try {
+        active.load()
+
+        await active.play()
+
+        if (requestId !== videoRequestId.current) return
+
+        window.clearTimeout(videoLoadingTimer.current)
+        setVideoLoading(false)
+      } catch {
+        if (requestId !== videoRequestId.current) return
+
+        window.clearTimeout(videoLoadingTimer.current)
+
+        if (active.readyState >= 2) {
+          setVideoLoading(false)
+        }
+      }
+    }
+
+    playVideo()
 
     return () => {
-      clearTimeout(videoLoadingTimer.current)
+      window.clearTimeout(videoLoadingTimer.current)
     }
-  }, [index, videos, order])
+  }, [current?.video, index, muted, speed])
 
-  // ==================================================
-  // PRELOAD NEXT 2 VIDEOS
-  // ==================================================
-
+  /*
+   * Preload next two videos
+   */
   useEffect(() => {
-    if (!videos.length || !order.length) return
+    if (!order.length || !videos.length) return
 
     const nextIndexes = []
 
-    for (let n = 1; n <= 2; n++) {
-      const position = (index + n) % order.length
-      const videoIndex = order[position]
+    for (let i = 1; i <= 2; i++) {
+      const nextPosition =
+        (index + i) % order.length
 
-      if (videoIndex !== undefined) {
-        nextIndexes.push(videoIndex)
+      const videoIndex = order[nextPosition]
+
+      if (
+        videoIndex !== undefined &&
+        videos[videoIndex]?.video
+      ) {
+        nextIndexes.push({
+          position: nextPosition,
+          video: videos[videoIndex]
+        })
       }
     }
 
-    // Remove old preloaders.
+    /*
+     * Remove preloaders that are no longer needed.
+     */
     Object.keys(preloadRefs.current).forEach((key) => {
-      const videoIndex = Number(key)
+      if (
+        !nextIndexes.some(
+          (item) => String(item.position) === key
+        )
+      ) {
+        const element = preloadRefs.current[key]
 
-      if (!nextIndexes.includes(videoIndex)) {
-        const item = preloadRefs.current[videoIndex]
+        try {
+          element.pause()
+          element.removeAttribute('src')
+          element.load()
+        } catch {}
 
-        if (item?.video) {
-          try {
-            item.video.pause()
-            item.video.removeAttribute('src')
-            item.video.load()
-          } catch {}
-        }
-
-        if (item?.timer) {
-          clearInterval(item.timer)
-        }
-
-        if (item?.timeout) {
-          clearTimeout(item.timeout)
-        }
-
-        delete preloadRefs.current[videoIndex]
+        delete preloadRefs.current[key]
       }
     })
 
-    // Create next 2 preloaders.
-    nextIndexes.forEach((videoIndex) => {
-      const data = videos[videoIndex]
+    /*
+     * Create preload videos.
+     */
+    nextIndexes.forEach(({ position, video }) => {
+      if (preloadRefs.current[position]) return
 
-      if (!data?.video) return
+      const element = document.createElement('video')
 
-      if (preloadRefs.current[videoIndex]) {
-        return
-      }
+      element.preload = 'auto'
+      element.muted = true
+      element.playsInline = true
+      element.src = video.video
 
-      const preloadVideo = document.createElement('video')
-
-      preloadVideo.preload = 'auto'
-      preloadVideo.muted = true
-      preloadVideo.playsInline = true
-
-      preloadVideo.setAttribute(
-        'playsinline',
-        ''
+      element.addEventListener(
+        'loadedmetadata',
+        () => {
+          try {
+            element.currentTime = 0
+          } catch {}
+        },
+        { once: true }
       )
 
-      preloadVideo.setAttribute(
-        'webkit-playsinline',
-        'true'
-      )
-
-      preloadVideo.src = data.video
-
-      let stopped = false
-
-      const stopAfterFiveSeconds = () => {
-        if (stopped) return
-
-        try {
-          if (!preloadVideo.buffered.length) {
-            return
-          }
-
-          const bufferedEnd =
-            preloadVideo.buffered.end(
-              preloadVideo.buffered.length - 1
-            )
-
-          if (bufferedEnd >= 5) {
-            stopped = true
-
-            preloadVideo.pause()
-
-            preloadVideo.removeEventListener(
-              'progress',
-              stopAfterFiveSeconds
-            )
-
-            preloadVideo.removeEventListener(
-              'canprogress',
-              stopAfterFiveSeconds
-            )
-          }
-        } catch {}
-      }
-
-      preloadVideo.addEventListener(
+      element.addEventListener(
         'progress',
-        stopAfterFiveSeconds
-      )
-
-      preloadVideo.addEventListener(
-        'canprogress',
-        stopAfterFiveSeconds
-      )
-
-      preloadVideo.load()
-
-      const checkTimer = setInterval(() => {
-        if (stopped) {
-          clearInterval(checkTimer)
-          return
+        () => {
+          /*
+           * Encourage browser buffering.
+           */
+          try {
+            if (
+              element.buffered.length &&
+              element.buffered.end(0) >= 5
+            ) {
+              element.pause()
+            }
+          } catch {}
         }
+      )
 
-        stopAfterFiveSeconds()
-      }, 250)
+      preloadRefs.current[position] = element
 
-      const safetyTimeout = setTimeout(() => {
-        clearInterval(checkTimer)
-      }, 15000)
-
-      preloadRefs.current[videoIndex] = {
-        video: preloadVideo,
-        timer: checkTimer,
-        timeout: safetyTimeout
-      }
+      try {
+        element.load()
+      } catch {}
     })
 
     return () => {
-      Object.keys(preloadRefs.current).forEach((key) => {
-        const item = preloadRefs.current[key]
+      /*
+       * Keep preloaders alive between reel changes.
+       */
+    }
+  }, [index, order, videos])
 
-        if (item?.video) {
-          try {
-            item.video.pause()
-            item.video.removeAttribute('src')
-            item.video.load()
-          } catch {}
-        }
+  /*
+   * Mute
+   */
+  const toggleMute = () => {
+    setMuted((value) => !value)
+  }
 
-        if (item?.timer) {
-          clearInterval(item.timer)
-        }
+  /*
+   * Speed
+   */
+  const changeSpeed = () => {
+    setSpeed((currentSpeed) => {
+      const currentIndex = SPEEDS.indexOf(currentSpeed)
 
-        if (item?.timeout) {
-          clearTimeout(item.timeout)
+      const nextIndex =
+        currentIndex === -1
+          ? 0
+          : (currentIndex + 1) % SPEEDS.length
+
+      const nextSpeed = SPEEDS[nextIndex]
+
+      Object.values(videoRefs.current).forEach((video) => {
+        if (video) {
+          video.playbackRate = nextSpeed
         }
       })
 
-      preloadRefs.current = {}
-    }
-  }, [index, videos, order])
+      return nextSpeed
+    })
+  }
 
-  // ==================================================
-  // MUTE
-  // ==================================================
+  /*
+   * Long press = 2x speed
+   */
+  const startHoldSpeed = () => {
+    if (changingSpeed.current) return
 
-  useEffect(() => {
-    const active = videoRefs.current[index]
+    longPressActive.current = false
 
-    if (!active) return
+    window.clearTimeout(holdTimer.current)
 
-    active.muted = muted
-  }, [muted, index])
+    holdTimer.current = window.setTimeout(() => {
+      const active = videoRefs.current[index]
 
-  // ==================================================
-  // SPEED
-  // ==================================================
+      if (!active) return
 
-  useEffect(() => {
-    const active = videoRefs.current[index]
+      longPressActive.current = true
+      changingSpeed.current = true
 
-    if (!active) return
+      wasPlayingBeforeHold.current = !active.paused
 
-    if (longPressActive.current) return
+      active.playbackRate = 2
+      setHoldSpeedActive(true)
 
-    changingSpeed.current = true
+      if (!wasPlayingBeforeHold.current) {
+        active.pause()
+      }
+    }, 450)
+  }
 
-    active.playbackRate = speed
+  const stopHoldSpeed = () => {
+    window.clearTimeout(holdTimer.current)
 
-    setVideoLoading(false)
-
-    const timer = setTimeout(() => {
+    if (!holdSpeedActive) {
       changingSpeed.current = false
-    }, 500)
-
-    return () => {
-      clearTimeout(timer)
+      return
     }
-  }, [speed, index])
 
-  // ==================================================
-  // KEYBOARD
-  // ==================================================
+    const active = videoRefs.current[index]
 
-  useEffect(() => {
-    const key = (e) => {
-      if (
-        e.key === 'ArrowDown' ||
-        e.key === 'PageDown'
-      ) {
-        e.preventDefault()
-        go(1)
-      }
+    if (active) {
+      active.playbackRate = speed
 
-      if (
-        e.key === 'ArrowUp' ||
-        e.key === 'PageUp'
-      ) {
-        e.preventDefault()
-        go(-1)
-      }
-
-      if (e.key === 'm') {
-        setMuted((m) => !m)
-      }
-
-      if (e.key === 'f') {
-        toggleFullscreen()
-      }
-
-      if (
-        e.key === 'Escape' &&
-        document.fullscreenElement
-      ) {
-        document.exitFullscreen()
+      if (wasPlayingBeforeHold.current) {
+        active.play().catch(() => {})
       }
     }
 
-    window.addEventListener('keydown', key)
+    setHoldSpeedActive(false)
 
-    return () => {
-      window.removeEventListener('keydown', key)
-    }
-  }, [go])
+    window.setTimeout(() => {
+      changingSpeed.current = false
+    }, 50)
+  }
 
-  // ==================================================
-  // WHEEL
-  // ==================================================
+  /*
+   * Progress
+   */
+  const handleTimeUpdate = (event) => {
+    const video = event.currentTarget
 
-  useEffect(() => {
-    const onWheel = (e) => {
-      if (wheelLock.current) return
-
-      if (Math.abs(e.deltaY) < 25) return
-
-      wheelLock.current = true
-
-      go(e.deltaY > 0 ? 1 : -1)
-
-      setTimeout(() => {
-        wheelLock.current = false
-      }, 450)
+    if (!video.duration) {
+      setProgress(0)
+      return
     }
 
-    window.addEventListener(
-      'wheel',
-      onWheel,
-      {
-        passive: false
-      }
+    setProgress(
+      (video.currentTime / video.duration) * 100
     )
+  }
 
-    return () => {
-      window.removeEventListener(
-        'wheel',
-        onWheel
+  /*
+   * Seek
+   */
+  const seek = (event) => {
+    event.stopPropagation()
+
+    const active = videoRefs.current[index]
+
+    if (!active || !active.duration) return
+
+    const rect =
+      event.currentTarget.getBoundingClientRect()
+
+    const percentage =
+      (event.clientX - rect.left) / rect.width
+
+    active.currentTime =
+      Math.max(
+        0,
+        Math.min(
+          active.duration,
+          active.duration * percentage
+        )
       )
+  }
+
+  /*
+   * Flash message
+   */
+  const flashMessage = (message) => {
+    showFlash(message)
+  }
+
+  /*
+   * Share
+   *
+   * Uses:
+   * current.post
+   *
+   * Example:
+   * https://viralmms.com/post/punjabi-kudi
+   *
+   * Creates:
+   * https://xlive-stream.vercel.app/share/punjabi-kudi
+   */
+  const share = async () => {
+    if (!current) return
+
+    let slug = ''
+
+    if (current.post) {
+      try {
+        const postUrl = new URL(current.post)
+
+        const parts = postUrl.pathname
+          .split('/')
+          .filter(Boolean)
+
+        slug = parts[parts.length - 1] || ''
+      } catch {
+        slug = ''
+      }
     }
-  }, [go])
 
-  // ==================================================
-  // SEEK
-  // ==================================================
+    /*
+     * Fallback when post is missing.
+     */
+    if (!slug && current.title) {
+      slug = current.title
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+    }
 
-  const seek = (e) => {
-    const v = videoRefs.current[index]
+    if (!slug) {
+      showFlash('Unable to create share link')
+      return
+    }
 
-    if (!v || !v.duration) return
+    const url =
+      `${window.location.origin}/share/` +
+      encodeURIComponent(slug)
 
-    const r =
-      e.currentTarget.getBoundingClientRect()
-
-    v.currentTime =
-      ((e.clientX - r.left) / r.width) *
-      v.duration
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: current.title || 'Watch Video',
+          text: current.title || 'Watch Video',
+          url
+        })
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url)
+        showFlash('Link copied')
+      } else {
+        window.prompt(
+          'Copy this link:',
+          url
+        )
+      }
+    } catch {
+      /*
+       * User cancelled native share.
+       */
+    }
   }
 
-  // ==================================================
-  // FLASH
-  // ==================================================
+  /*
+   * Download
+   */
+  const download = () => {
+    if (!current?.download) {
+      showFlash('Download unavailable')
+      return
+    }
 
-  const showFlash = (text) => {
-    setFlash(text)
+    const link = document.createElement('a')
 
-    setTimeout(() => {
-      setFlash('')
-    }, 700)
+    link.href = current.download
+    link.download = current.title || 'video'
+    link.target = '_blank'
+    link.rel = 'noopener noreferrer'
+
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
   }
 
-  // ==================================================
-  // FULLSCREEN
-  // ==================================================
+  /*
+   * Fullscreen
+   */
+  const fullscreen = async () => {
+    const active = videoRefs.current[index]
 
-  const toggleFullscreen = async () => {
-    const video = videoRefs.current[index]
-
-    if (!video) return
+    if (!active) return
 
     try {
       if (document.fullscreenElement) {
@@ -572,820 +606,491 @@ export default function Reels() {
         return
       }
 
-      if (video.requestFullscreen) {
-        await video.requestFullscreen()
-        return
-      }
-
-      if (video.webkitEnterFullscreen) {
-        video.webkitEnterFullscreen()
+      if (active.requestFullscreen) {
+        await active.requestFullscreen()
+      } else if (active.webkitEnterFullscreen) {
+        active.webkitEnterFullscreen()
       }
     } catch {}
   }
 
-  // ==================================================
-  // FIT
-  // ==================================================
+  /*
+   * Change video fit
+   */
+  const changeFit = () => {
+    setFit((currentFit) => {
+      const currentIndex = FITS.indexOf(currentFit)
 
-  const toggleFit = () => {
-    setFit(
-      (f) =>
-        FITS[
-          (FITS.indexOf(f) + 1) % FITS.length
-        ]
-    )
+      const nextIndex =
+        currentIndex === -1
+          ? 0
+          : (currentIndex + 1) % FITS.length
+
+      return FITS[nextIndex]
+    })
   }
 
-  // ==================================================
-  // SPEED
-  // ==================================================
-
-  const toggleSpeed = () => {
-    setSpeed(
-      (s) =>
-        SPEEDS[
-          (SPEEDS.indexOf(s) + 1) %
-            SPEEDS.length
-        ]
-    )
-  }
-
-  // ==================================================
-  // SHARE
-  // ==================================================
-
-  const share = async () => {
-    if (!current?.title) return
-
-    // IMPORTANT:
-    // Always use the actual /share route.
-    //
-    // This prevents:
-    // /undefined/?reel=...
-    //
-    // Result:
-    // https://xlive-stream.vercel.app/share?reel=Video
-    const url =
-      `${window.location.origin}/share?reel=` +
-      encodeURIComponent(current.title)
-
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: current.title,
-          text: current.title,
-          url
-        })
-      } else {
-        await navigator.clipboard.writeText(url)
-
-        showFlash('Link copied')
+  /*
+   * Keyboard controls
+   */
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (
+        event.target?.tagName === 'INPUT' ||
+        event.target?.tagName === 'TEXTAREA'
+      ) {
+        return
       }
-    } catch {
-      // User cancelled share.
+
+      if (
+        event.key === 'ArrowDown' ||
+        event.key === 'PageDown'
+      ) {
+        event.preventDefault()
+        go(1)
+      }
+
+      if (
+        event.key === 'ArrowUp' ||
+        event.key === 'PageUp'
+      ) {
+        event.preventDefault()
+        go(-1)
+      }
+
+      if (event.key === 'm' || event.key === 'M') {
+        toggleMute()
+      }
+
+      if (event.key === 'f' || event.key === 'F') {
+        fullscreen()
+      }
+
+      if (event.key === ' ') {
+        event.preventDefault()
+
+        const active = videoRefs.current[index]
+
+        if (!active) return
+
+        if (active.paused) {
+          active.play().catch(() => {})
+        } else {
+          active.pause()
+        }
+      }
     }
-  }
 
-  // ==================================================
-  // DOWNLOAD
-  // ==================================================
+    window.addEventListener(
+      'keydown',
+      handleKeyDown
+    )
 
-  const download = () => {
-    if (!current?.download) return
+    return () => {
+      window.removeEventListener(
+        'keydown',
+        handleKeyDown
+      )
+    }
+  }, [go, index])
 
-    const a = document.createElement('a')
+  /*
+   * Mouse wheel
+   */
+  useEffect(() => {
+    const handleWheel = (event) => {
+      if (wheelLock.current) return
 
-    a.href = current.download
-    a.download = 'reel.mp4'
-    a.target = '_blank'
-    a.rel = 'noopener'
+      if (Math.abs(event.deltaY) < 20) return
 
-    a.click()
-  }
+      wheelLock.current = true
 
-  // ==================================================
-  // TOUCH START
-  // ==================================================
+      go(event.deltaY > 0 ? 1 : -1)
 
-  const startTouch = (e) => {
-    if (!e.touches?.length) return
+      window.setTimeout(() => {
+        wheelLock.current = false
+      }, 450)
+    }
+
+    window.addEventListener(
+      'wheel',
+      handleWheel,
+      { passive: true }
+    )
+
+    return () => {
+      window.removeEventListener(
+        'wheel',
+        handleWheel
+      )
+    }
+  }, [go])
+
+  /*
+   * Touch swipe
+   */
+  const handleTouchStart = (event) => {
+    if (!event.touches?.length) return
 
     touchStart.current = {
-      x: e.touches[0].clientX,
-      y: e.touches[0].clientY
+      x: event.touches[0].clientX,
+      y: event.touches[0].clientY
     }
   }
 
-  // ==================================================
-  // TOUCH END
-  // ==================================================
-
-  const endTouch = (e) => {
+  const handleTouchEnd = (event) => {
     if (!touchStart.current) return
+    if (!event.changedTouches?.length) return
 
-    const dy =
-      e.changedTouches[0].clientY -
-      touchStart.current.y
+    const end = event.changedTouches[0]
 
-    const dx =
-      e.changedTouches[0].clientX -
-      touchStart.current.x
+    const deltaX =
+      end.clientX - touchStart.current.x
+
+    const deltaY =
+      end.clientY - touchStart.current.y
 
     touchStart.current = null
 
-    if (
-      Math.abs(dy) > 50 &&
-      Math.abs(dy) > Math.abs(dx)
-    ) {
-      go(dy < 0 ? 1 : -1)
-    }
-  }
+    /*
+     * Ignore horizontal swipes.
+     */
+    if (Math.abs(deltaY) < 50) return
 
-  // ==================================================
-  // VIDEO CLICK
-  // ==================================================
-
-  const clickVideo = (e) => {
-    e.preventDefault()
-    e.stopPropagation()
-  }
-
-  // ==================================================
-  // LONG PRESS START
-  // ==================================================
-
-  const holdStart = (e) => {
-    if (
-      e.pointerType === 'mouse' &&
-      e.button !== 0
-    ) {
+    if (Math.abs(deltaY) < Math.abs(deltaX)) {
       return
     }
 
-    const v = videoRefs.current[index]
-
-    if (!v) return
-
-    clearTimeout(holdTimer.current)
-
-    wasPlayingBeforeHold.current =
-      !v.paused
-
-    holdTimer.current = setTimeout(() => {
-      const active =
-        videoRefs.current[index]
-
-      if (!active) return
-
-      longPressActive.current = true
-
-      setHoldSpeedActive(true)
-
-      active.playbackRate = 2
-
-      if (
-        wasPlayingBeforeHold.current
-      ) {
-        active.play().catch(() => {})
-      }
-    }, 450)
+    go(deltaY < 0 ? 1 : -1)
   }
 
-  // ==================================================
-  // LONG PRESS END
-  // ==================================================
+  /*
+   * Video error
+   */
+  const handleVideoError = () => {
+    window.clearTimeout(videoLoadingTimer.current)
 
-  const holdEnd = () => {
-    clearTimeout(holdTimer.current)
-
-    const v = videoRefs.current[index]
-
-    if (!v) return
-
-    if (longPressActive.current) {
-      longPressActive.current = false
-
-      setHoldSpeedActive(false)
-
-      v.playbackRate = speed
-
-      if (
-        wasPlayingBeforeHold.current
-      ) {
-        v.play().catch(() => {})
-      }
-    }
+    setVideoLoading(false)
+    setError('Unable to play this video.')
   }
 
-  // ==================================================
-  // CLEANUP
-  // ==================================================
+  /*
+   * Retry current video
+   */
+  const retryVideo = () => {
+    setError('')
 
-  useEffect(() => {
-    return () => {
-      clearTimeout(holdTimer.current)
-      clearTimeout(videoLoadingTimer.current)
+    const active = videoRefs.current[index]
 
-      Object.keys(
-        preloadRefs.current
-      ).forEach((key) => {
-        const item =
-          preloadRefs.current[key]
+    if (!active) return
 
-        if (item?.video) {
-          try {
-            item.video.pause()
-            item.video.removeAttribute('src')
-            item.video.load()
-          } catch {}
-        }
+    try {
+      active.load()
 
-        if (item?.timer) {
-          clearInterval(item.timer)
-        }
+      active.play().catch(() => {})
+    } catch {}
+  }
 
-        if (item?.timeout) {
-          clearTimeout(item.timeout)
-        }
-      })
-
-      preloadRefs.current = {}
-    }
-  }, [])
-
-  // ==================================================
-  // DATA LOADING
-  // ==================================================
-
+  /*
+   * Loading screen
+   */
   if (dataLoading) {
     return (
-      <div className="loading-screen">
-        <div className="big-loader" />
-      </div>
-    )
-  }
-
-  if (error && !videos.length) {
-    return (
-      <div className="error-screen">
-        <p>{error}</p>
-
-        <button
-          onClick={() =>
-            window.location.reload()
-          }
-        >
-          Retry
-        </button>
-      </div>
-    )
-  }
-
-  if (!current) {
-    return (
-      <div className="error-screen">
-        <p>No reels found.</p>
-      </div>
-    )
-  }
-
-  // ==================================================
-  // THREE VISIBLE POSITIONS
-  // ==================================================
-
-  const wrappers =
-    [-1, 0, 1].map((offset) => ({
-      offset,
-      i: index + offset,
-      data:
-        videos[
-          getIndex(index + offset)
-        ]
-    }))
-
-  // ==================================================
-  // RENDER
-  // ==================================================
-
-  return (
-    <main
-      className="reels-app"
-      onTouchStart={startTouch}
-      onTouchEnd={endTouch}
-    >
-
-      {/* ============================================
-          LIVE BUTTON
-      ============================================ */}
-
-      <div className="live-button">
-        <button
-          onClick={() =>
-            navigate('/live')
-          }
-        >
-          <img
-            src="/assets/live.png"
-            alt=""
-          />
-
-          <span>LIVE</span>
-        </button>
-      </div>
-
-      {/* ============================================
-          LOGO
-      ============================================ */}
-
-      <div
-        className="brand-logo"
-        onClick={() => {
-          setIndex(0)
-          navigate('/')
-        }}
-      >
-        <img
-          src="/assets/your-logo.png"
-          alt={APP.name}
-        />
-      </div>
-
-      {/* ============================================
-          VIDEO CONTAINER
-      ============================================ */}
-
-      <div className="video-container">
-
-        {wrappers.map(
-          ({
-            offset,
-            i,
-            data
-          }) =>
-            data ? (
-              <article
-                key={`${getIndex(i)}-${i}`}
-                className="video-wrapper"
-                style={{
-                  transform:
-                    `translateY(${offset * 100}%)`
-                }}
-              >
-
-                <video
-                  ref={(el) => {
-                    videoRefs.current[i] = el
-                  }}
-
-                  /*
-                   * NO POSTER.
-                   *
-                   * Video only.
-                   */
-
-                  src={data.video}
-
-                  preload={
-                    i === index
-                      ? 'auto'
-                      : 'none'
-                  }
-
-                  playsInline
-                  webkit-playsinline="true"
-
-                  muted={muted}
-
-                  loop={false}
-
-                  draggable={false}
-
-                  controls={false}
-
-                  onContextMenu={(e) => {
-                    e.preventDefault()
-                  }}
-
-                  onDragStart={(e) => {
-                    e.preventDefault()
-                  }}
-
-                  onClick={clickVideo}
-
-                  style={{
-                    objectFit:
-                      fit === 'fill'
-                        ? 'cover'
-                        : fit === 'fit'
-                          ? 'contain'
-                          : 'cover',
-
-                    WebkitTouchCallout:
-                      'none',
-
-                    WebkitUserSelect:
-                      'none',
-
-                    userSelect:
-                      'none',
-
-                    WebkitTapHighlightColor:
-                      'transparent'
-                  }}
-
-                  // =================================
-                  // VIDEO LOADING
-                  // =================================
-
-                  onLoadStart={() => {
-                    if (i !== index) return
-
-                    // No immediate spinner.
-                    setError('')
-                  }}
-
-                  onLoadedMetadata={(e) => {
-                    if (i !== index) return
-
-                    const video =
-                      e.currentTarget
-
-                    video.muted = muted
-                    video.playbackRate = speed
-                  }}
-
-                  onCanPlay={() => {
-                    if (i !== index) return
-
-                    clearTimeout(
-                      videoLoadingTimer.current
-                    )
-
-                    setVideoLoading(false)
-                    setError('')
-                  }}
-
-                  onPlaying={() => {
-                    if (i !== index) return
-
-                    clearTimeout(
-                      videoLoadingTimer.current
-                    )
-
-                    setVideoLoading(false)
-                    setError('')
-
-                    changingSpeed.current =
-                      false
-                  }}
-
-                  // =================================
-                  // BUFFERING
-                  // =================================
-
-                  onWaiting={() => {
-                    if (
-                      i !== index ||
-                      changingSpeed.current ||
-                      longPressActive.current
-                    ) {
-                      return
-                    }
-
-                    clearTimeout(
-                      videoLoadingTimer.current
-                    )
-
-                    videoLoadingTimer.current =
-                      setTimeout(() => {
-                        const v =
-                          videoRefs.current[
-                            index
-                          ]
-
-                        if (!v) return
-
-                        if (
-                          v.paused ||
-                          v.readyState < 3
-                        ) {
-                          setVideoLoading(true)
-                        }
-                      }, 1000)
-                  }}
-
-                  onStalled={() => {
-                    if (i !== index) return
-
-                    if (
-                      changingSpeed.current ||
-                      longPressActive.current
-                    ) {
-                      return
-                    }
-
-                    clearTimeout(
-                      videoLoadingTimer.current
-                    )
-
-                    videoLoadingTimer.current =
-                      setTimeout(() => {
-                        const v =
-                          videoRefs.current[
-                            index
-                          ]
-
-                        if (!v) return
-
-                        if (
-                          v.paused ||
-                          v.readyState < 3
-                        ) {
-                          setVideoLoading(true)
-                        }
-                      }, 1000)
-                  }}
-
-                  // =================================
-                  // ERROR
-                  // =================================
-
-                  onError={() => {
-                    if (i !== index) return
-
-                    clearTimeout(
-                      videoLoadingTimer.current
-                    )
-
-                    setVideoLoading(false)
-
-                    setError(
-                      'Video could not be loaded.'
-                    )
-                  }}
-
-                  // =================================
-                  // PROGRESS
-                  // =================================
-
-                  onTimeUpdate={(e) => {
-                    if (i !== index) return
-
-                    const video =
-                      e.currentTarget
-
-                    if (
-                      video.duration &&
-                      Number.isFinite(
-                        video.duration
-                      )
-                    ) {
-                      setProgress(
-                        (video.currentTime /
-                          video.duration) *
-                          100
-                      )
-                    }
-                  }}
-
-                  // =================================
-                  // ENDED
-                  // =================================
-
-                  onEnded={() => {
-                    if (i === index) {
-                      go(1)
-                    }
-                  }}
-
-                  // =================================
-                  // LONG PRESS 2X
-                  // =================================
-
-                  onPointerDown={holdStart}
-                  onPointerUp={holdEnd}
-                  onPointerCancel={holdEnd}
-                  onPointerLeave={holdEnd}
-                />
-
-                {/* ==================================
-                    VIDEO INFO
-                ================================== */}
-
-                <div className="video-info">
-
-                  <div className="video-title">
-                    {data.isLive
-                      ? '🔴 Live - '
-                      : ''}
-
-                    {data.title}
-                  </div>
-
-                </div>
-
-              </article>
-            ) : null
-        )}
-
-      </div>
-
-      {/* ============================================
-          VIDEO SPINNER
-      ============================================ */}
-
-      {videoLoading && !error && (
-        <div className="spinner">
-          <div className="loader" />
+      <main className="reels-page">
+        <div className="reels-loading">
+          Loading...
         </div>
-      )}
+      </main>
+    )
+  }
 
-      {/* ============================================
-          ERROR
-      ============================================ */}
+  /*
+   * Data error
+   */
+  if (error && !current) {
+    return (
+      <main className="reels-page">
+        <div className="reels-error">
+          <h1>Unable to load videos</h1>
 
-      {error && (
-        <div className="error-msg">
-
-          <div>
-            {error}
-          </div>
+          <p>{error}</p>
 
           <button
-            onClick={() => {
-              const v =
-                videoRefs.current[index]
-
-              clearTimeout(
-                videoLoadingTimer.current
-              )
-
-              setError('')
-              setVideoLoading(false)
-              setProgress(0)
-
-              if (!v) {
-                setError(
-                  'Video could not be loaded.'
-                )
-
-                return
-              }
-
-              try {
-                v.load()
-
-                const playPromise =
-                  v.play()
-
-                if (playPromise) {
-                  playPromise.catch(
-                    () => {}
-                  )
-                }
-
-                videoLoadingTimer.current =
-                  setTimeout(() => {
-                    if (
-                      v.paused ||
-                      v.readyState < 2
-                    ) {
-                      setVideoLoading(true)
-                    }
-                  }, 1000)
-              } catch {
-                setVideoLoading(false)
-
-                setError(
-                  'Video could not be loaded.'
-                )
-              }
-            }}
+            type="button"
+            onClick={() => window.location.reload()}
           >
             Retry
           </button>
-
         </div>
-      )}
+      </main>
+    )
+  }
 
-      {/* ============================================
-          CONTROLS
-      ============================================ */}
+  /*
+   * No current video
+   */
+  if (!current) {
+    return (
+      <main className="reels-page">
+        <div className="reels-error">
+          <h1>No video available</h1>
+        </div>
+      </main>
+    )
+  }
 
-      <div className="top-controls">
+  /*
+   * Render previous/current/next
+   */
+  const wrappers = [-1, 0, 1]
 
-        <ControlButton
-          icon={
-            muted
-              ? '/assets/mute.png'
-              : '/assets/unmute.png'
+  return (
+    <main
+      className={`reels-page fit-${fit}`}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
+      <div className="reels-container">
+        {wrappers.map((offset) => {
+          let position = index + offset
+
+          if (position < 0) {
+            position = order.length - 1
           }
-          onClick={() =>
-            setMuted((m) => !m)
+
+          if (position >= order.length) {
+            position = 0
           }
-          title={
-            muted
-              ? 'Unmute'
-              : 'Mute'
-          }
+
+          const videoIndex = order[position]
+          const video = videos[videoIndex]
+
+          if (!video) return null
+
+          const isCurrent = offset === 0
+
+          return (
+            <div
+              key={`${video.video}-${position}`}
+              className="video-wrapper"
+              style={{
+                transform:
+                  `translateY(${offset * 100}%)`
+              }}
+            >
+              <video
+                ref={(element) => {
+                  if (element) {
+                    videoRefs.current[position] =
+                      element
+                  } else {
+                    delete videoRefs.current[position]
+                  }
+                }}
+                className={`reel-video ${
+                  fit === 'fill'
+                    ? 'video-fill'
+                    : fit === 'auto'
+                      ? 'video-auto'
+                      : 'video-fit'
+                }`}
+                src={video.video}
+                muted={muted}
+                playsInline
+                preload={
+                  isCurrent
+                    ? 'auto'
+                    : 'metadata'
+                }
+                onTimeUpdate={
+                  isCurrent
+                    ? handleTimeUpdate
+                    : undefined
+                }
+                onEnded={
+                  isCurrent
+                    ? () => go(1)
+                    : undefined
+                }
+                onError={
+                  isCurrent
+                    ? handleVideoError
+                    : undefined
+                }
+              />
+
+              {isCurrent && videoLoading && (
+                <div className="video-loading">
+                  <div className="loading-spinner" />
+                </div>
+              )}
+
+              {isCurrent && error && (
+                <div className="video-error">
+                  <p>{error}</p>
+
+                  <button
+                    type="button"
+                    onClick={retryVideo}
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+            </div>
+          )
+        })}
+
+        /*
+         * Top/bottom navigation touch zones
+         */
+        <button
+          type="button"
+          className="reel-prev-zone"
+          aria-label="Previous video"
+          onClick={() => {
+            if (longPressActive.current) {
+              longPressActive.current = false
+              return
+            }
+
+            go(-1)
+          }}
+          onPointerDown={startHoldSpeed}
+          onPointerUp={stopHoldSpeed}
+          onPointerCancel={stopHoldSpeed}
+          onPointerLeave={stopHoldSpeed}
         />
 
-        <ControlButton
-          label={
-            fit === 'fit'
-              ? 'Fit'
-              : fit === 'fill'
-                ? 'Fill'
-                : 'Auto'
-          }
-          onClick={toggleFit}
-          title="Change video fit"
+        <button
+          type="button"
+          className="reel-next-zone"
+          aria-label="Next video"
+          onClick={() => {
+            if (longPressActive.current) {
+              longPressActive.current = false
+              return
+            }
+
+            go(1)
+          }}
+          onPointerDown={startHoldSpeed}
+          onPointerUp={stopHoldSpeed}
+          onPointerCancel={stopHoldSpeed}
+          onPointerLeave={stopHoldSpeed}
         />
 
-        <ControlButton
-          label={`${speed}x`}
-          onClick={toggleSpeed}
-          title="Change video speed"
-        />
-
-        <ControlButton
-          icon="/assets/fullscreen-logo.png"
-          onClick={toggleFullscreen}
-          title="Fullscreen"
-        />
-
-        {current.download && (
-          <ControlButton
-            icon="/assets/download.png"
-            onClick={download}
-            title="Download"
-          />
+        {holdSpeedActive && (
+          <div className="hold-speed-indicator">
+            2×
+          </div>
         )}
 
-        <ControlButton
-          icon="/assets/share.png"
-          onClick={share}
-          title="Share"
-        />
-
-        <ControlButton
-          icon="/assets/logout.png"
-          onClick={() => {
-            localStorage.removeItem(
-              'xlive_logged_in'
-            )
-
-            navigate('/login', {
-              replace: true
-            })
-          }}
-          title="Logout"
-        />
-
-      </div>
-
-      {/* ============================================
-          PROGRESS
-      ============================================ */}
-
-      <div
-        className="global-progress-container"
-        onClick={seek}
-      >
+        /*
+         * Progress bar
+         */
         <div
-          className="global-progress-bar"
-          style={{
-            width: `${progress}%`
-          }}
-        />
-      </div>
-
-      {/* ============================================
-          2X INDICATOR
-      ============================================ */}
-
-      {holdSpeedActive && (
-        <div className="seek-flash">
-          2×
+          className="video-progress-container"
+          onClick={seek}
+        >
+          <div
+            className="video-progress"
+            style={{
+              width: `${progress}%`
+            }}
+          />
         </div>
-      )}
 
-      {flash &&
-        !holdSpeedActive && (
-          <div className="seek-flash">
+        /*
+         * Right controls
+         */
+        <div className="reels-controls">
+          <ControlButton
+            src={
+              muted
+                ? '/assets/mute.png'
+                : '/assets/unmute.png'
+            }
+            alt={muted ? 'Unmute' : 'Mute'}
+            onClick={toggleMute}
+          />
+
+          <ControlButton
+            src="/assets/share.png"
+            alt="Share"
+            onClick={share}
+          />
+
+          <ControlButton
+            src="/assets/fullscreen-logo.png"
+            alt="Fullscreen"
+            onClick={fullscreen}
+          />
+
+          <ControlButton
+            src="/assets/download.png"
+            alt="Download"
+            onClick={download}
+          />
+
+          <ControlButton
+            alt={`Speed ${speed}x`}
+            onClick={changeSpeed}
+          >
+            {speed}x
+          </ControlButton>
+
+          <ControlButton
+            alt={`Fit ${fit}`}
+            onClick={changeFit}
+          >
+            {fit}
+          </ControlButton>
+        </div>
+
+        /*
+         * Video information
+         */
+        <div className="reel-info">
+          {videoTitle && (
+            <h1>{current.title}</h1>
+          )}
+
+          {current.post && (
+            <button
+              type="button"
+              className="reel-post-button"
+              onClick={() => {
+                window.open(
+                  current.post,
+                  '_blank',
+                  'noopener,noreferrer'
+                )
+              }}
+            >
+              View Post
+            </button>
+          )}
+        </div>
+
+        /*
+         * Flash
+         */
+        {flash && (
+          <div className="reels-flash">
             {flash}
           </div>
         )}
 
-      {/* ============================================
-          COUNTER
-      ============================================ */}
-
-      <div className="reel-counter">
-        {index + 1} / {order.length}
+        /*
+         * Optional app branding
+         */
+        {APP?.name && (
+          <div className="reels-app-name">
+            {APP.name}
+          </div>
+        )}
       </div>
-
     </main>
   )
 }
-
