@@ -1,12 +1,20 @@
 import { useState } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import {
+  Routes,
+  Route,
+  Navigate
+} from 'react-router-dom'
 
 import Login from './pages/Login'
 import Reels from './pages/Reels'
+import Share from './pages/Share'
 import Live from './pages/Live'
 import LiveWatch from './pages/LiveWatch'
 
-function Protected({ children, loggedIn }) {
+function Protected({
+  children,
+  loggedIn
+}) {
   if (!loggedIn) {
     return (
       <Navigate
@@ -20,19 +28,20 @@ function Protected({ children, loggedIn }) {
 }
 
 export default function App() {
-  const [loggedIn, setLoggedIn] = useState(
-    () =>
-      localStorage.getItem(
-        'xlive_logged_in'
-      ) === 'true'
-  )
+  const [loggedIn, setLoggedIn] =
+    useState(
+      () =>
+        localStorage.getItem(
+          'xlive_logged_in'
+        ) === 'true'
+    )
 
   return (
     <Routes>
 
-      {/* ==============================
+      {/* ==================================
           LOGIN
-      ============================== */}
+      ================================== */}
 
       <Route
         path="/login"
@@ -52,13 +61,13 @@ export default function App() {
         }
       />
 
-
-      {/* ==============================
+      {/* ==================================
           PUBLIC REELS
 
-          Shared URLs can open directly:
-          /?reel=video-title
-      ============================== */}
+          Example:
+          /
+          /?reel=Desi%20GF%20Live
+      ================================== */}
 
       <Route
         path="/"
@@ -67,10 +76,23 @@ export default function App() {
         }
       />
 
+      {/* ==================================
+          PUBLIC SHARE PAGE
 
-      {/* ==============================
-          PROTECTED LIVE LIST
-      ============================== */}
+          Example:
+          /share?reel=Desi%20GF%20Live
+      ================================== */}
+
+      <Route
+        path="/share"
+        element={
+          <Share />
+        }
+      />
+
+      {/* ==================================
+          PROTECTED LIVE PAGE
+      ================================== */}
 
       <Route
         path="/live"
@@ -83,10 +105,9 @@ export default function App() {
         }
       />
 
-
-      {/* ==============================
+      {/* ==================================
           PROTECTED LIVE WATCH
-      ============================== */}
+      ================================== */}
 
       <Route
         path="/live-watch"
@@ -99,10 +120,9 @@ export default function App() {
         }
       />
 
-
-      {/* ==============================
+      {/* ==================================
           UNKNOWN ROUTES
-      ============================== */}
+      ================================== */}
 
       <Route
         path="*"
