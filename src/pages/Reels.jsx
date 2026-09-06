@@ -1,4 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState
+} from 'react'
 import { useLocation } from 'react-router-dom'
 import ControlButton from '../components/ControlButton'
 import { APP } from '../config'
@@ -12,7 +17,10 @@ function shuffle(array) {
   for (let i = result.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
 
-    ;[result[i], result[j]] = [result[j], result[i]]
+    ;[result[i], result[j]] = [
+      result[j],
+      result[i]
+    ]
   }
 
   return result
@@ -35,7 +43,8 @@ export default function Reels() {
 
   const [progress, setProgress] = useState(0)
   const [flash, setFlash] = useState('')
-  const [holdSpeedActive, setHoldSpeedActive] = useState(false)
+  const [holdSpeedActive, setHoldSpeedActive] =
+    useState(false)
 
   const videoRefs = useRef({})
   const preloadRefs = useRef({})
@@ -45,13 +54,13 @@ export default function Reels() {
 
   const holdTimer = useRef(null)
   const videoLoadingTimer = useRef(null)
+  const flashTimer = useRef(null)
 
   const wasPlayingBeforeHold = useRef(false)
   const longPressActive = useRef(false)
   const changingSpeed = useRef(false)
 
   const videoRequestId = useRef(0)
-  const flashTimer = useRef(null)
 
   /*
    * Flash message
@@ -67,7 +76,7 @@ export default function Reels() {
   }, [])
 
   /*
-   * Load videos.json
+   * Load videos
    */
   useEffect(() => {
     let cancelled = false
@@ -80,7 +89,9 @@ export default function Reels() {
     })
       .then((response) => {
         if (!response.ok) {
-          throw new Error('Unable to load videos.')
+          throw new Error(
+            'Unable to load videos.'
+          )
         }
 
         return response.json()
@@ -89,65 +100,70 @@ export default function Reels() {
         if (cancelled) return
 
         const list = Array.isArray(data)
-          ? data.filter((item) => item?.video)
+          ? data.filter(
+              (item) => item?.video
+            )
           : []
 
         if (!list.length) {
-          throw new Error('No videos found.')
+          throw new Error(
+            'No videos found.'
+          )
         }
 
         setVideos(list)
 
-        /*
-         * Normal random order
-         */
         let shuffled = shuffle(list)
 
         /*
-         * If opened as:
+         * Support:
          *
          * /?reel=VIDEO_TITLE
-         *
-         * put that video first.
          */
-        const params = new URLSearchParams(
-          location.search
-        )
-
-        const reelTitle = params.get('reel')
-
-        if (reelTitle) {
-          let decodedTitle = reelTitle
-
-          try {
-            decodedTitle = decodeURIComponent(reelTitle)
-          } catch {}
-
-          const targetIndex = shuffled.findIndex(
-            (video) =>
-              (video.title || '')
-                .trim()
-                .toLowerCase() ===
-              decodedTitle
-                .trim()
-                .toLowerCase()
+        const params =
+          new URLSearchParams(
+            location.search
           )
 
+        const reelTitle =
+          params.get('reel')
+
+        if (reelTitle) {
+          let decodedTitle =
+            reelTitle
+
+          try {
+            decodedTitle =
+              decodeURIComponent(
+                reelTitle
+              )
+          } catch {}
+
+          const targetIndex =
+            shuffled.findIndex(
+              (video) =>
+                (video.title || '')
+                  .trim()
+                  .toLowerCase() ===
+                decodedTitle
+                  .trim()
+                  .toLowerCase()
+            )
+
           if (targetIndex !== -1) {
-            const target = shuffled[targetIndex]
+            const target =
+              shuffled[targetIndex]
 
             shuffled = [
               target,
               ...shuffled.filter(
-                (_, i) => i !== targetIndex
+                (_, i) =>
+                  i !== targetIndex
               )
             ]
           }
         }
 
-        /*
-         * Store indexes rather than objects.
-         */
         setOrder(
           shuffled.map((video) =>
             list.indexOf(video)
@@ -162,7 +178,7 @@ export default function Reels() {
 
         setError(
           err.message ||
-          'Unable to load videos.'
+            'Unable to load videos.'
         )
 
         setDataLoading(false)
@@ -176,11 +192,14 @@ export default function Reels() {
   /*
    * Current video
    */
-  const currentVideoIndex = order[index]
-  const current = videos[currentVideoIndex]
+  const currentVideoIndex =
+    order[index]
+
+  const current =
+    videos[currentVideoIndex]
 
   /*
-   * Change reel
+   * Go next / previous
    */
   const go = useCallback(
     (delta) => {
@@ -201,13 +220,17 @@ export default function Reels() {
       setProgress(0)
 
       setIndex((previous) => {
-        let next = previous + delta
+        let next =
+          previous + delta
 
         if (next < 0) {
-          next = order.length - 1
+          next =
+            order.length - 1
         }
 
-        if (next >= order.length) {
+        if (
+          next >= order.length
+        ) {
           next = 0
         }
 
@@ -218,14 +241,18 @@ export default function Reels() {
   )
 
   /*
-   * Stop non-active videos
+   * Stop videos that aren't current
    */
   useEffect(() => {
-    Object.entries(videoRefs.current).forEach(
-      ([key, video]) => {
+    Object.entries(
+      videoRefs.current
+    ).forEach(
+      ([position, video]) => {
         if (!video) return
 
-        if (Number(key) !== index) {
+        if (
+          Number(position) !== index
+        ) {
           video.pause()
         }
       }
@@ -233,7 +260,7 @@ export default function Reels() {
   }, [index])
 
   /*
-   * Start active video
+   * Start current video
    */
   useEffect(() => {
     if (!current?.video) return
@@ -258,7 +285,8 @@ export default function Reels() {
     active.playbackRate = speed
 
     /*
-     * Spinner is delayed by 1 second.
+     * Show spinner only after 1 second
+     * if video hasn't started.
      */
     videoLoadingTimer.current =
       window.setTimeout(() => {
@@ -277,40 +305,34 @@ export default function Reels() {
         }
       }, 1000)
 
-    const playVideo = async () => {
-      try {
-        active.load()
+    const startVideo =
+      async () => {
+        try {
+          active.load()
 
-        await active.play()
+          await active.play()
 
-        if (
-          requestId !==
-          videoRequestId.current
-        ) {
-          return
+          if (
+            requestId !==
+            videoRequestId.current
+          ) {
+            return
+          }
+
+          window.clearTimeout(
+            videoLoadingTimer.current
+          )
+
+          setVideoLoading(false)
+        } catch {
+          /*
+           * Browser autoplay can fail.
+           * Keep the video visible.
+           */
         }
-
-        window.clearTimeout(
-          videoLoadingTimer.current
-        )
-
-        setVideoLoading(false)
-      } catch {
-        if (
-          requestId !==
-          videoRequestId.current
-        ) {
-          return
-        }
-
-        /*
-         * Autoplay may be blocked.
-         * Don't immediately show an error.
-         */
       }
-    }
 
-    playVideo()
+    startVideo()
 
     return () => {
       window.clearTimeout(
@@ -335,65 +357,74 @@ export default function Reels() {
       return
     }
 
-    const nextIndexes = []
+    const nextVideos = []
 
-    for (let i = 1; i <= 2; i++) {
-      const nextPosition =
-        (index + i) % order.length
+    for (
+      let i = 1;
+      i <= 2;
+      i++
+    ) {
+      const position =
+        (index + i) %
+        order.length
 
       const videoIndex =
-        order[nextPosition]
+        order[position]
 
       const video =
         videos[videoIndex]
 
       if (video?.video) {
-        nextIndexes.push({
-          position: nextPosition,
+        nextVideos.push({
+          position,
           video
         })
       }
     }
 
-    /*
-     * Remove old preload videos.
-     */
     Object.keys(
       preloadRefs.current
     ).forEach((key) => {
-      const stillNeeded =
-        nextIndexes.some(
+      const needed =
+        nextVideos.some(
           (item) =>
-            String(item.position) === key
+            String(
+              item.position
+            ) === key
         )
 
-      if (!stillNeeded) {
+      if (!needed) {
         const element =
           preloadRefs.current[key]
 
         try {
           element.pause()
-          element.removeAttribute('src')
+          element.removeAttribute(
+            'src'
+          )
           element.load()
         } catch {}
 
-        delete preloadRefs.current[key]
+        delete preloadRefs.current[
+          key
+        ]
       }
     })
 
-    /*
-     * Create preload videos.
-     */
-    nextIndexes.forEach(
+    nextVideos.forEach(
       ({ position, video }) => {
         if (
-          preloadRefs.current[position]
+          preloadRefs.current[
+            position
+          ]
         ) {
           return
         }
 
         const element =
-          document.createElement('video')
+          document.createElement(
+            'video'
+          )
 
         element.preload = 'auto'
         element.muted = true
@@ -405,8 +436,11 @@ export default function Reels() {
           () => {
             try {
               if (
-                element.buffered.length &&
-                element.buffered.end(0) >= 5
+                element.buffered
+                  .length &&
+                element.buffered.end(
+                  0
+                ) >= 5
               ) {
                 element.pause()
               }
@@ -414,8 +448,9 @@ export default function Reels() {
           }
         )
 
-        preloadRefs.current[position] =
-          element
+        preloadRefs.current[
+          position
+        ] = element
 
         try {
           element.load()
@@ -432,124 +467,155 @@ export default function Reels() {
    * Mute
    */
   const toggleMute = () => {
-    setMuted((value) => !value)
+    setMuted(
+      (value) => !value
+    )
   }
 
   /*
-   * Change playback speed
+   * Playback speed
    */
   const changeSpeed = () => {
-    setSpeed((currentSpeed) => {
-      const currentIndex =
-        SPEEDS.indexOf(currentSpeed)
+    setSpeed(
+      (currentSpeed) => {
+        const currentIndex =
+          SPEEDS.indexOf(
+            currentSpeed
+          )
 
-      const nextIndex =
-        currentIndex === -1
-          ? 0
-          : (currentIndex + 1) %
-            SPEEDS.length
+        const nextIndex =
+          currentIndex === -1
+            ? 0
+            : (
+                currentIndex + 1
+              ) %
+                SPEEDS.length
 
-      const nextSpeed =
-        SPEEDS[nextIndex]
+        const nextSpeed =
+          SPEEDS[nextIndex]
 
-      Object.values(
-        videoRefs.current
-      ).forEach((video) => {
-        if (video) {
-          video.playbackRate =
-            nextSpeed
-        }
-      })
+        Object.values(
+          videoRefs.current
+        ).forEach((video) => {
+          if (video) {
+            video.playbackRate =
+              nextSpeed
+          }
+        })
 
-      return nextSpeed
-    })
+        return nextSpeed
+      }
+    )
   }
 
   /*
-   * Long press = 2x speed
+   * Long press = 2x
    */
-  const startHoldSpeed = () => {
-    if (changingSpeed.current) {
-      return
+  const startHoldSpeed =
+    () => {
+      if (
+        changingSpeed.current
+      ) {
+        return
+      }
+
+      longPressActive.current =
+        false
+
+      window.clearTimeout(
+        holdTimer.current
+      )
+
+      holdTimer.current =
+        window.setTimeout(() => {
+          const active =
+            videoRefs.current[
+              index
+            ]
+
+          if (!active) return
+
+          longPressActive.current =
+            true
+
+          changingSpeed.current =
+            true
+
+          wasPlayingBeforeHold.current =
+            !active.paused
+
+          active.playbackRate = 2
+
+          setHoldSpeedActive(
+            true
+          )
+        }, 450)
     }
 
-    longPressActive.current = false
-
-    window.clearTimeout(
-      holdTimer.current
-    )
-
-    holdTimer.current =
-      window.setTimeout(() => {
-        const active =
-          videoRefs.current[index]
-
-        if (!active) return
-
-        longPressActive.current = true
-        changingSpeed.current = true
-
-        wasPlayingBeforeHold.current =
-          !active.paused
-
-        active.playbackRate = 2
-
-        setHoldSpeedActive(true)
-      }, 450)
-  }
-
-  const stopHoldSpeed = () => {
-    window.clearTimeout(
-      holdTimer.current
-    )
-
-    if (!holdSpeedActive) {
-      changingSpeed.current = false
-      return
-    }
-
-    const active =
-      videoRefs.current[index]
-
-    if (active) {
-      active.playbackRate = speed
+  const stopHoldSpeed =
+    () => {
+      window.clearTimeout(
+        holdTimer.current
+      )
 
       if (
-        wasPlayingBeforeHold.current
+        !holdSpeedActive
       ) {
-        active
-          .play()
-          .catch(() => {})
+        changingSpeed.current =
+          false
+        return
       }
+
+      const active =
+        videoRefs.current[index]
+
+      if (active) {
+        active.playbackRate =
+          speed
+
+        if (
+          wasPlayingBeforeHold.current
+        ) {
+          active
+            .play()
+            .catch(() => {})
+        }
+      }
+
+      setHoldSpeedActive(
+        false
+      )
+
+      window.setTimeout(() => {
+        changingSpeed.current =
+          false
+      }, 50)
     }
-
-    setHoldSpeedActive(false)
-
-    window.setTimeout(() => {
-      changingSpeed.current = false
-    }, 50)
-  }
 
   /*
-   * Video progress
+   * Progress
    */
-  const handleTimeUpdate = (
-    event
-  ) => {
-    const video =
-      event.currentTarget
+  const handleTimeUpdate =
+    (event) => {
+      const video =
+        event.currentTarget
 
-    if (!video.duration) {
-      setProgress(0)
-      return
+      if (
+        !video.duration ||
+        !Number.isFinite(
+          video.duration
+        )
+      ) {
+        setProgress(0)
+        return
+      }
+
+      setProgress(
+        (video.currentTime /
+          video.duration) *
+          100
+      )
     }
-
-    setProgress(
-      (video.currentTime /
-        video.duration) *
-        100
-    )
-  }
 
   /*
    * Seek
@@ -568,11 +634,11 @@ export default function Reels() {
     }
 
     const rect =
-      event.currentTarget
-        .getBoundingClientRect()
+      event.currentTarget.getBoundingClientRect()
 
     const percentage =
-      (event.clientX - rect.left) /
+      (event.clientX -
+        rect.left) /
       rect.width
 
     active.currentTime =
@@ -589,27 +655,26 @@ export default function Reels() {
   /*
    * Share
    *
-   * Example:
+   * JSON:
    *
-   * post:
-   * https://viralmms.com/post/punjabi-kudi
+   * "post":
+   * "https://viralmms.com/post/punjabi-kudi"
    *
-   * share:
-   * https://xlive-stream.vercel.app/share/punjabi-kudi
+   * Generates:
+   *
+   * /share/punjabi-kudi
    */
   const share = async () => {
     if (!current) return
 
     let slug = ''
 
-    /*
-     * First choice:
-     * get slug from "post".
-     */
     if (current.post) {
       try {
         const postUrl =
-          new URL(current.post)
+          new URL(
+            current.post
+          )
 
         const parts =
           postUrl.pathname
@@ -617,16 +682,16 @@ export default function Reels() {
             .filter(Boolean)
 
         slug =
-          parts[parts.length - 1] ||
-          ''
+          parts[
+            parts.length - 1
+          ] || ''
       } catch {
         slug = ''
       }
     }
 
     /*
-     * Fallback:
-     * generate slug from title.
+     * Fallback to title.
      */
     if (
       !slug &&
@@ -686,7 +751,7 @@ export default function Reels() {
       }
     } catch {
       /*
-       * User cancelled sharing.
+       * User cancelled.
        */
     }
   }
@@ -721,121 +786,134 @@ export default function Reels() {
     )
 
     link.click()
+
     link.remove()
   }
 
   /*
    * Fullscreen
    */
-  const fullscreen = async () => {
-    const active =
-      videoRefs.current[index]
+  const fullscreen =
+    async () => {
+      const active =
+        videoRefs.current[index]
 
-    if (!active) return
+      if (!active) return
 
-    try {
-      if (
-        document.fullscreenElement
-      ) {
-        await document.exitFullscreen()
-        return
-      }
+      try {
+        if (
+          document.fullscreenElement
+        ) {
+          await document.exitFullscreen()
+          return
+        }
 
-      if (
-        active.requestFullscreen
-      ) {
-        await active.requestFullscreen()
-      } else if (
-        active.webkitEnterFullscreen
-      ) {
-        active.webkitEnterFullscreen()
-      }
-    } catch {}
-  }
+        if (
+          active.requestFullscreen
+        ) {
+          await active.requestFullscreen()
+        } else if (
+          active.webkitEnterFullscreen
+        ) {
+          active.webkitEnterFullscreen()
+        }
+      } catch {}
+    }
 
   /*
-   * Change fit mode
+   * Fit mode
    */
   const changeFit = () => {
-    setFit((currentFit) => {
-      const currentIndex =
-        FITS.indexOf(currentFit)
+    setFit(
+      (currentFit) => {
+        const currentIndex =
+          FITS.indexOf(
+            currentFit
+          )
 
-      const nextIndex =
-        currentIndex === -1
-          ? 0
-          : (currentIndex + 1) %
-            FITS.length
+        const nextIndex =
+          currentIndex === -1
+            ? 0
+            : (
+                currentIndex + 1
+              ) %
+                FITS.length
 
-      return FITS[nextIndex]
-    })
+        return FITS[nextIndex]
+      }
+    )
   }
 
   /*
-   * Keyboard controls
+   * Keyboard
    */
   useEffect(() => {
-    const handleKeyDown = (
-      event
-    ) => {
-      if (
-        event.target?.tagName ===
-          'INPUT' ||
-        event.target?.tagName ===
-          'TEXTAREA'
-      ) {
-        return
-      }
+    const handleKeyDown =
+      (event) => {
+        if (
+          event.target?.tagName ===
+            'INPUT' ||
+          event.target?.tagName ===
+            'TEXTAREA'
+        ) {
+          return
+        }
 
-      if (
-        event.key === 'ArrowDown' ||
-        event.key === 'PageDown'
-      ) {
-        event.preventDefault()
-        go(1)
-      }
+        if (
+          event.key ===
+            'ArrowDown' ||
+          event.key ===
+            'PageDown'
+        ) {
+          event.preventDefault()
+          go(1)
+        }
 
-      if (
-        event.key === 'ArrowUp' ||
-        event.key === 'PageUp'
-      ) {
-        event.preventDefault()
-        go(-1)
-      }
+        if (
+          event.key ===
+            'ArrowUp' ||
+          event.key ===
+            'PageUp'
+        ) {
+          event.preventDefault()
+          go(-1)
+        }
 
-      if (
-        event.key === 'm' ||
-        event.key === 'M'
-      ) {
-        toggleMute()
-      }
+        if (
+          event.key === 'm' ||
+          event.key === 'M'
+        ) {
+          toggleMute()
+        }
 
-      if (
-        event.key === 'f' ||
-        event.key === 'F'
-      ) {
-        fullscreen()
-      }
+        if (
+          event.key === 'f' ||
+          event.key === 'F'
+        ) {
+          fullscreen()
+        }
 
-      if (
-        event.key === ' '
-      ) {
-        event.preventDefault()
+        if (
+          event.key === ' '
+        ) {
+          event.preventDefault()
 
-        const active =
-          videoRefs.current[index]
+          const active =
+            videoRefs.current[
+              index
+            ]
 
-        if (!active) return
+          if (!active) return
 
-        if (active.paused) {
-          active
-            .play()
-            .catch(() => {})
-        } else {
-          active.pause()
+          if (active.paused) {
+            active
+              .play()
+              .catch(() => {})
+          } else {
+            active.pause()
+          }
         }
       }
-    }
 
     window.addEventListener(
       'keydown',
@@ -854,32 +932,36 @@ export default function Reels() {
    * Mouse wheel
    */
   useEffect(() => {
-    const handleWheel = (
-      event
-    ) => {
-      if (wheelLock.current) {
-        return
+    const handleWheel =
+      (event) => {
+        if (
+          wheelLock.current
+        ) {
+          return
+        }
+
+        if (
+          Math.abs(
+            event.deltaY
+          ) < 20
+        ) {
+          return
+        }
+
+        wheelLock.current =
+          true
+
+        go(
+          event.deltaY > 0
+            ? 1
+            : -1
+        )
+
+        window.setTimeout(() => {
+          wheelLock.current =
+            false
+        }, 450)
       }
-
-      if (
-        Math.abs(event.deltaY) <
-        20
-      ) {
-        return
-      }
-
-      wheelLock.current = true
-
-      go(
-        event.deltaY > 0
-          ? 1
-          : -1
-      )
-
-      window.setTimeout(() => {
-        wheelLock.current = false
-      }, 450)
-    }
 
     window.addEventListener(
       'wheel',
@@ -900,97 +982,93 @@ export default function Reels() {
   /*
    * Touch start
    */
-  const handleTouchStart = (
-    event
-  ) => {
-    if (
-      !event.touches?.length
-    ) {
-      return
-    }
+  const handleTouchStart =
+    (event) => {
+      if (
+        !event.touches?.length
+      ) {
+        return
+      }
 
-    touchStart.current = {
-      x:
-        event.touches[0]
-          .clientX,
-      y:
-        event.touches[0]
-          .clientY
+      touchStart.current = {
+        x:
+          event.touches[0]
+            .clientX,
+        y:
+          event.touches[0]
+            .clientY
+      }
     }
-  }
 
   /*
    * Touch end
    */
-  const handleTouchEnd = (
-    event
-  ) => {
-    if (
-      !touchStart.current
-    ) {
-      return
+  const handleTouchEnd =
+    (event) => {
+      if (
+        !touchStart.current
+      ) {
+        return
+      }
+
+      if (
+        !event.changedTouches
+          ?.length
+      ) {
+        return
+      }
+
+      const end =
+        event.changedTouches[0]
+
+      const deltaX =
+        end.clientX -
+        touchStart.current.x
+
+      const deltaY =
+        end.clientY -
+        touchStart.current.y
+
+      touchStart.current = null
+
+      if (
+        Math.abs(deltaY) < 50
+      ) {
+        return
+      }
+
+      if (
+        Math.abs(deltaY) <
+        Math.abs(deltaX)
+      ) {
+        return
+      }
+
+      go(
+        deltaY < 0
+          ? 1
+          : -1
+      )
     }
-
-    if (
-      !event.changedTouches
-        ?.length
-    ) {
-      return
-    }
-
-    const end =
-      event.changedTouches[0]
-
-    const deltaX =
-      end.clientX -
-      touchStart.current.x
-
-    const deltaY =
-      end.clientY -
-      touchStart.current.y
-
-    touchStart.current = null
-
-    if (
-      Math.abs(deltaY) < 50
-    ) {
-      return
-    }
-
-    /*
-     * Ignore horizontal swipes.
-     */
-    if (
-      Math.abs(deltaY) <
-      Math.abs(deltaX)
-    ) {
-      return
-    }
-
-    go(
-      deltaY < 0
-        ? 1
-        : -1
-    )
-  }
 
   /*
    * Video error
    */
-  const handleVideoError = () => {
-    window.clearTimeout(
-      videoLoadingTimer.current
-    )
+  const handleVideoError =
+    () => {
+      window.clearTimeout(
+        videoLoadingTimer.current
+      )
 
-    setVideoLoading(false)
+      setVideoLoading(false)
 
-    setError(
-      'Unable to play this video.'
-    )
-  }
+      setError(
+        'Unable to play this video.'
+      )
+    }
 
   /*
-   * Retry video
+   * Retry
    */
   const retryVideo = () => {
     setError('')
@@ -1010,7 +1088,7 @@ export default function Reels() {
   }
 
   /*
-   * Loading
+   * Data loading
    */
   if (dataLoading) {
     return (
@@ -1082,6 +1160,7 @@ export default function Reels() {
       }
     >
       <div className="reels-container">
+
         {wrappers.map(
           (offset) => {
             let position =
@@ -1144,6 +1223,7 @@ export default function Reels() {
                   src={video.video}
                   muted={muted}
                   playsInline
+                  autoPlay={isCurrent}
                   preload={
                     isCurrent
                       ? 'auto'
@@ -1193,9 +1273,7 @@ export default function Reels() {
           }
         )}
 
-        /*
-         * Previous zone
-         */
+        {/* Previous / long press zone */}
         <button
           type="button"
           className="reel-prev-zone"
@@ -1225,9 +1303,7 @@ export default function Reels() {
           }
         />
 
-        /*
-         * Next zone
-         */
+        {/* Next / long press zone */}
         <button
           type="button"
           className="reel-next-zone"
@@ -1257,18 +1333,14 @@ export default function Reels() {
           }
         />
 
-        /*
-         * Hold speed indicator
-         */
+        {/* 2x indicator */}
         {holdSpeedActive && (
           <div className="hold-speed-indicator">
             2×
           </div>
         )}
 
-        /*
-         * Progress bar
-         */
+        {/* Progress bar */}
         <div
           className="video-progress-container"
           onClick={seek}
@@ -1282,10 +1354,9 @@ export default function Reels() {
           />
         </div>
 
-        /*
-         * Right-side controls
-         */
+        {/* Right controls */}
         <div className="reels-controls">
+
           <ControlButton
             src={
               muted
@@ -1341,12 +1412,12 @@ export default function Reels() {
           >
             {fit}
           </ControlButton>
+
         </div>
 
-        /*
-         * Video information
-         */
+        {/* Video information */}
         <div className="reel-info">
+
           {current.title && (
             <h1>
               {current.title}
@@ -1368,25 +1439,35 @@ export default function Reels() {
               View Post
             </button>
           )}
+
         </div>
 
-        /*
-         * Flash message
-         */
+        {/* App logo / name */}
+        {APP?.logo && (
+          <img
+            className="reels-app-logo"
+            src={APP.logo}
+            alt={
+              APP?.name ||
+              'XLive'
+            }
+          />
+        )}
+
+        {!APP?.logo &&
+          APP?.name && (
+            <div className="reels-app-name">
+              {APP.name}
+            </div>
+          )}
+
+        {/* Flash */}
         {flash && (
           <div className="reels-flash">
             {flash}
           </div>
         )}
 
-        /*
-         * App name
-         */
-        {APP?.name && (
-          <div className="reels-app-name">
-            {APP.name}
-          </div>
-        )}
       </div>
     </main>
   )
